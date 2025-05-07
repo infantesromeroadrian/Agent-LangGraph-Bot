@@ -16,7 +16,7 @@ class LangSmithConfig(BaseModel):
 class LLMConfig(BaseModel):
     """Configuration for Language Models."""
     openai_api_key: str = os.getenv("OPENAI_API_KEY", "")
-    model_name: str = os.getenv("LLM_MODEL_NAME", "gpt-4")
+    model_name: str = os.getenv("LLM_MODEL_NAME", "gpt-4o")
     temperature: float = float(os.getenv("LLM_TEMPERATURE", "0.0"))
     max_tokens: int = int(os.getenv("LLM_MAX_TOKENS", "2000"))
 

@@ -2,7 +2,7 @@
 from typing import Dict, List, Tuple, Any, Optional
 from langchain_core.messages import HumanMessage
 
-from src.models.class_models import GraphState, AgentRole, MessageType
+from src.models.class_models import GraphState, AgentRole, MessageType, CompanyDocument
 from src.services.llm_service import LLMService
 from src.services.vector_store_service import VectorStoreService
 from src.agents.agent_utils import (
@@ -88,7 +88,7 @@ class AgentNodes:
         return state
         
     def researcher_agent(self, state: GraphState) -> GraphState:
-        """Researcher agent to find information.
+        """Researcher agent with external knowledge capabilities.
         
         Args:
             state: Current graph state
@@ -98,6 +98,21 @@ class AgentNodes:
         """
         # Set current agent
         state.current_agent = AgentRole.RESEARCHER
+        
+        # Check if we need external knowledge
+        external_docs = self._process_external_knowledge(state.human_query)
+        
+        # Add external knowledge to context
+        if external_docs:
+            state.context.extend(external_docs)
+            
+            # Add a system message about external sources
+            system_msg = create_message(
+                f"Retrieved information from {len(external_docs)} external sources.",
+                MessageType.SYSTEM,
+                "system"
+            )
+            state.messages.append(system_msg)
         
         # Create prompt for researcher
         prompt = create_agent_prompt(
@@ -124,6 +139,132 @@ class AgentNodes:
         state.agent_responses[AgentRole.RESEARCHER] = agent_response
         
         return state
+        
+    def _process_external_knowledge(self, query: str) -> List[CompanyDocument]:
+        """Process query for external knowledge needs.
+        
+        Args:
+            query: User query
+            
+        Returns:
+            List of CompanyDocument objects with external knowledge
+        """
+        from src.services.external_knowledge_service import ExternalKnowledgeService
+        import logging
+        
+        logger = logging.getLogger(__name__)
+        external_docs = []
+        
+        # Initialize external knowledge service if not already
+        if not hasattr(self, "external_knowledge"):
+            self.external_knowledge = ExternalKnowledgeService()
+        
+        # Extract entities and intents from query
+        entities = self._extract_entities(query)
+        intents = self._extract_intents(query)
+        
+        logger.info(f"Extracted entities: {entities}")
+        logger.info(f"Extracted intents: {intents}")
+        
+        # Check weather intent
+        if any(intent in ["weather", "clima", "temperatura"] for intent in intents):
+            if "location" in entities:
+                logger.info(f"Getting weather for location: {entities['location']}")
+                weather_doc = self.external_knowledge.get_weather(entities["location"])
+                external_docs.append(weather_doc)
+        
+        # Check wikipedia intent
+        if any(intent in ["definition", "information", "wiki", "what is"] for intent in intents):
+            if "topic" in entities:
+                logger.info(f"Querying Wikipedia for topic: {entities['topic']}")
+                wiki_doc = self.external_knowledge.query_wikipedia(entities["topic"])
+                external_docs.append(wiki_doc)
+        
+        # Check news intent
+        if any(intent in ["news", "noticias", "current events"] for intent in intents):
+            if "topic" in entities:
+                logger.info(f"Getting news for topic: {entities['topic']}")
+                news_doc = self.external_knowledge.get_news(entities["topic"])
+                external_docs.append(news_doc)
+        
+        return external_docs
+    
+    def _extract_entities(self, query: str) -> Dict[str, str]:
+        """Extract entities from query using LLM.
+        
+        Args:
+            query: User query
+            
+        Returns:
+            Dictionary of entities
+        """
+        # Use LLM to extract entities
+        prompt = """
+        Extract entities from this query. Return a JSON with these possible keys:
+        - location: any location mentioned (city, country, etc.)
+        - topic: main topic, concept, or subject to search information about
+        - time_period: any time period mentioned
+        
+        Query: {query}
+        
+        JSON:
+        """
+        
+        chain = self.llm_service.create_chain(prompt)
+        result = chain.invoke({"query": query})
+        
+        # Parse result (assuming JSON format)
+        try:
+            import json
+            entities = json.loads(result)
+            return entities
+        except:
+            # Fallback to simple keyword extraction if JSON parsing fails
+            entities = {}
+            
+            # Simple location detection
+            common_locations = ["madrid", "barcelona", "new york", "london", "paris"]
+            for location in common_locations:
+                if location.lower() in query.lower():
+                    entities["location"] = location
+                    break
+            
+            # Simple topic extraction (naive approach)
+            if "about" in query.lower():
+                parts = query.lower().split("about")
+                if len(parts) > 1:
+                    entities["topic"] = parts[1].strip()
+            
+            return entities
+    
+    def _extract_intents(self, query: str) -> List[str]:
+        """Extract intents from query.
+        
+        Args:
+            query: User query
+            
+        Returns:
+            List of intents
+        """
+        # Simple keyword-based intent detection
+        intents = []
+        
+        # Weather intent
+        weather_keywords = ["weather", "clima", "temperatura", "forecast", "lluvia", "sol"]
+        if any(keyword in query.lower() for keyword in weather_keywords):
+            intents.append("weather")
+        
+        # Wikipedia/information intent
+        wiki_keywords = ["what is", "definition", "información sobre", "qué es", "tell me about", "wiki"]
+        if any(keyword in query.lower() for keyword in wiki_keywords):
+            intents.append("information")
+        
+        # News intent
+        news_keywords = ["news", "noticias", "current events", "actualidad", "últimas noticias"]
+        if any(keyword in query.lower() for keyword in news_keywords):
+            intents.append("news")
+        
+        return intents
         
     def analyst_agent(self, state: GraphState) -> GraphState:
         """Analyst agent to analyze information.
