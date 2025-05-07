@@ -1,0 +1,88 @@
+# Archivos de entorno
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Jupyter Notebooks
+.ipynb_checkpoints
+
+# VSCode
+.vscode/
+
+# PyCharm
+.idea/
+
+# Docker
+.docker/
+docker-compose.override.yml
+
+# ChromaDB y datos
+/data/chroma/
+/data/*.db
+/data/index/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
+.directory
+
+# Archivos temporales
+*.swp
+*.swo
+*.tmp
+*~
+
+# Archivos grandes, modelos o vectores
+*.model
+*.bin
+*.pt
+*.pth
+*.h5
+
+# Dependencias y carga del sistema
+node_modules/
+/.cursor
+/.pnp
+.pnp.js
+
+# Archivos de autenticación y tokens
+auth_token*
+*_credentials.json
+credentials.json
+token.json 

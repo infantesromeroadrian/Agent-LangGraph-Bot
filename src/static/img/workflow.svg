@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="800" height="400" xmlns="http://www.w3.org/2000/svg">
+  <!-- Estilos -->
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#333" />
+    </marker>
+  </defs>
+  
+  <!-- Nodos -->
+  <rect x="100" y="50" width="140" height="50" rx="5" fill="#f8d7da" stroke="#f5c2c7" stroke-width="2"/>
+  <text x="170" y="80" font-family="Arial" font-size="14" text-anchor="middle">Consulta Usuario</text>
+  
+  <rect x="100" y="150" width="140" height="50" rx="5" fill="#d1e7dd" stroke="#badbcc" stroke-width="2"/>
+  <text x="170" y="180" font-family="Arial" font-size="14" text-anchor="middle">Agente Supervisor</text>
+  
+  <rect x="320" y="100" width="140" height="50" rx="5" fill="#cff4fc" stroke="#b6effb" stroke-width="2"/>
+  <text x="390" y="130" font-family="Arial" font-size="14" text-anchor="middle">Agente Investigador</text>
+  
+  <rect x="320" y="200" width="140" height="50" rx="5" fill="#e2e3e5" stroke="#d3d6d8" stroke-width="2"/>
+  <text x="390" y="230" font-family="Arial" font-size="14" text-anchor="middle">Agente Analista</text>
+  
+  <rect x="540" y="150" width="140" height="50" rx="5" fill="#fff3cd" stroke="#ffecb5" stroke-width="2"/>
+  <text x="610" y="180" font-family="Arial" font-size="14" text-anchor="middle">Agente Comunicador</text>
+  
+  <rect x="320" y="300" width="140" height="50" rx="5" fill="#f8d7da" stroke="#f5c2c7" stroke-width="2"/>
+  <text x="390" y="330" font-family="Arial" font-size="14" text-anchor="middle">Respuesta Final</text>
+  
+  <!-- Conexiones -->
+  <line x1="170" y1="100" x2="170" y2="150" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <line x1="240" y1="175" x2="320" y2="125" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <line x1="240" y1="175" x2="320" y2="225" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <line x1="460" y1="125" x2="540" y2="150" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <line x1="460" y1="225" x2="540" y2="175" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <line x1="610" y1="200" x2="390" y2="300" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
+</svg> 

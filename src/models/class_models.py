@@ -1,0 +1,86 @@
+"""Data models for the company agent application."""
+from enum import Enum
+from typing import Dict, List, Optional, Union
+from pydantic import BaseModel, Field
+
+
+class AgentRole(str, Enum):
+    """Roles that agents can have in the system."""
+    SUPERVISOR = "supervisor"
+    RESEARCHER = "researcher"
+    ANALYST = "analyst"
+    COMMUNICATOR = "communicator"
+
+
+class MessageType(str, Enum):
+    """Types of messages that can be exchanged."""
+    HUMAN = "human"
+    AI = "ai"
+    SYSTEM = "system"
+    TOOL = "tool"
+
+
+class ToolResultType(str, Enum):
+    """Types of results from tool execution."""
+    SUCCESS = "success"
+    ERROR = "error"
+    WARNING = "warning"
+
+
+class Message(BaseModel):
+    """Message exchanged between user and system."""
+    content: str
+    type: MessageType
+    sender: Optional[str] = None
+    timestamp: Optional[str] = None
+    metadata: Optional[Dict] = Field(default_factory=dict)
+
+
+class CompanyDocument(BaseModel):
+    """Document stored in the company knowledge base."""
+    id: str
+    title: str
+    content: str
+    document_type: str
+    metadata: Dict = Field(default_factory=dict)
+    source: Optional[str] = None
+    embedding: Optional[List[float]] = None
+
+
+class ToolResult(BaseModel):
+    """Result of a tool execution."""
+    tool_name: str
+    status: ToolResultType
+    result: Optional[Union[str, Dict, List, None]] = None
+    error_message: Optional[str] = None
+    metadata: Dict = Field(default_factory=dict)
+
+
+class QueryInput(BaseModel):
+    """Input for a user query."""
+    query: str
+    context: Optional[List[Message]] = Field(default_factory=list)
+    metadata: Optional[Dict] = Field(default_factory=dict)
+
+
+class AgentResponse(BaseModel):
+    """Response from an agent."""
+    content: str
+    agent_id: str
+    agent_role: AgentRole
+    confidence: float = 1.0
+    sources: List[str] = Field(default_factory=list)
+    thought_process: Optional[str] = None
+    metadata: Dict = Field(default_factory=dict)
+
+
+class GraphState(BaseModel):
+    """State maintained throughout the agent graph execution."""
+    messages: List[Message] = Field(default_factory=list)
+    current_agent: Optional[AgentRole] = None
+    human_query: Optional[str] = None
+    context: List[CompanyDocument] = Field(default_factory=list)
+    tool_results: List[ToolResult] = Field(default_factory=list)
+    agent_responses: Dict[str, AgentResponse] = Field(default_factory=dict)
+    final_response: Optional[str] = None
+    metadata: Dict = Field(default_factory=dict) 

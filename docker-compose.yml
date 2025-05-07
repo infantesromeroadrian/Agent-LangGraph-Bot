@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  agent-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: langchain-agent-app
+    ports:
+      - "5800:8000"
+    volumes:
+      - .:/app
+      - ./data:/app/data
+    env_file:
+      - .env
+    restart: unless-stopped
+    command: uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
+    
+  chroma-db:
+    image: chromadb/chroma:latest
+    container_name: chroma-db
+    ports:
+      - "8001:8000"
+    volumes:
+      - ./data/chroma:/chroma/chroma
+    restart: unless-stopped 
