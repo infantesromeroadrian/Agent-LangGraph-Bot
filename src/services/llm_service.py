@@ -1,6 +1,7 @@
 """Service for interacting with Language Models."""
 from langchain_core.language_models import BaseChatModel
 from langchain_openai import ChatOpenAI
+from langchain_groq import ChatGroq
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnableParallel, RunnablePassthrough
@@ -17,8 +18,17 @@ class LLMService:
         
     def _initialize_chat_model(self) -> BaseChatModel:
         """Initialize the chat model with configuration settings."""
+        # Prefer Groq if API key is available
+        if config.llm.groq_api_key:
+            return ChatGroq(
+                model=config.llm.model_name,
+                temperature=config.llm.temperature,
+                max_tokens=config.llm.max_tokens,
+                groq_api_key=config.llm.groq_api_key,
+            )
+        # Fall back to OpenAI if Groq not configured
         return ChatOpenAI(
-            model=config.llm.model_name,
+            model=config.llm.model_name if "gpt" in config.llm.model_name else "gpt-4o",  # ensure model name is compatible
             temperature=config.llm.temperature,
             max_tokens=config.llm.max_tokens,
             api_key=config.llm.openai_api_key,
