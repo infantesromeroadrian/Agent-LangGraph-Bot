@@ -6,10 +6,13 @@ from pydantic import BaseModel, Field
 
 class AgentRole(str, Enum):
     """Roles that agents can have in the system."""
-    SUPERVISOR = "supervisor"
-    RESEARCHER = "researcher"
-    ANALYST = "analyst"
-    COMMUNICATOR = "communicator"
+    SOLUTION_ARCHITECT = "solution_architect"
+    TECHNICAL_RESEARCH = "technical_research"
+    PROJECT_MANAGEMENT = "project_management"
+    CODE_REVIEW = "code_review"
+    CLIENT_COMMUNICATION = "client_communication"
+    MARKET_ANALYSIS = "market_analysis"
+    DATA_ANALYSIS = "data_analysis"
 
 
 class MessageType(str, Enum):

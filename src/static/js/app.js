@@ -11,18 +11,24 @@ const appState = {
     documents: [],
     darkMode: localStorage.getItem('darkMode') === 'true',
     activeAgents: {
-        supervisor: false,
-        researcher: false,
-        analyst: false,
-        communicator: false
+        solution_architect: false,
+        technical_research: false,
+        code_review: false,
+        project_management: false,
+        market_analysis: false,
+        data_analysis: false,
+        client_communication: false
     },
     sidebarVisible: false,
     processingSteps: {
         retrieveContext: { status: 'pending', content: '' },
-        supervisor: { status: 'pending', content: '' },
-        researcher: { status: 'pending', content: '' },
-        analyst: { status: 'pending', content: '' },
-        communicator: { status: 'pending', content: '' }
+        solution_architect: { status: 'pending', content: '' },
+        technical_research: { status: 'pending', content: '' },
+        code_review: { status: 'pending', content: '' },
+        project_management: { status: 'pending', content: '' },
+        market_analysis: { status: 'pending', content: '' },
+        data_analysis: { status: 'pending', content: '' },
+        client_communication: { status: 'pending', content: '' }
     }
 };
 
@@ -54,29 +60,41 @@ const elements = {
     toggleDetailsBtn: document.getElementById('toggleDetailsBtn'),
     timelineItems: {
         retrieveContext: document.getElementById('timelineRetrieveContext'),
-        supervisor: document.getElementById('timelineSupervisor'),
-        researcher: document.getElementById('timelineResearcher'),
-        analyst: document.getElementById('timelineAnalyst'),
-        communicator: document.getElementById('timelineCommunicator')
+        solution_architect: document.getElementById('timelineSolutionArchitect'),
+        technical_research: document.getElementById('timelineTechnicalResearch'),
+        code_review: document.getElementById('timelineCodeReview'),
+        project_management: document.getElementById('timelineProjectManagement'),
+        market_analysis: document.getElementById('timelineMarketAnalysis'),
+        data_analysis: document.getElementById('timelineDataAnalysis'),
+        client_communication: document.getElementById('timelineClientCommunication')
     },
     timelineContents: {
         retrieveContext: document.getElementById('retrieveContextContent'),
-        supervisor: document.getElementById('supervisorTimelineContent'),
-        researcher: document.getElementById('researcherTimelineContent'),
-        analyst: document.getElementById('analystTimelineContent'),
-        communicator: document.getElementById('communicatorTimelineContent')
+        solution_architect: document.getElementById('solutionArchitectTimelineContent'),
+        technical_research: document.getElementById('technicalResearchTimelineContent'),
+        code_review: document.getElementById('codeReviewTimelineContent'),
+        project_management: document.getElementById('projectManagementTimelineContent'),
+        market_analysis: document.getElementById('marketAnalysisTimelineContent'),
+        data_analysis: document.getElementById('dataAnalysisTimelineContent'),
+        client_communication: document.getElementById('clientCommunicationTimelineContent')
     },
     agentBadges: {
-        supervisor: document.getElementById('supervisorBadge'),
-        researcher: document.getElementById('researcherBadge'),
-        analyst: document.getElementById('analystBadge'),
-        communicator: document.getElementById('communicatorBadge')
+        solution_architect: document.getElementById('solutionArchitectBadge'),
+        technical_research: document.getElementById('technicalResearchBadge'),
+        code_review: document.getElementById('codeReviewBadge'),
+        project_management: document.getElementById('projectManagementBadge'),
+        market_analysis: document.getElementById('marketAnalysisBadge'),
+        data_analysis: document.getElementById('dataAnalysisBadge'),
+        client_communication: document.getElementById('clientCommunicationBadge')
     },
     agentPanels: {
-        supervisor: document.getElementById('supervisorContent'),
-        researcher: document.getElementById('researcherContent'),
-        analyst: document.getElementById('analystContent'),
-        communicator: document.getElementById('communicatorContent')
+        solution_architect: document.getElementById('solutionArchitectContent'),
+        technical_research: document.getElementById('technicalResearchContent'),
+        code_review: document.getElementById('codeReviewContent'),
+        project_management: document.getElementById('projectManagementContent'),
+        market_analysis: document.getElementById('marketAnalysisContent'),
+        data_analysis: document.getElementById('dataAnalysisContent'),
+        client_communication: document.getElementById('clientCommunicationContent')
     }
 };
 
@@ -174,9 +192,17 @@ function toggleMobileNav() {
 function toggleAgentSidebar() {
     appState.sidebarVisible = !appState.sidebarVisible;
     
+    // Verificar que los elementos existen
+    if (!elements.agentSidebar || !elements.mainContent) {
+        console.warn('Elementos de sidebar no encontrados');
+        return;
+    }
+    
     if (appState.sidebarVisible) {
         elements.agentSidebar.classList.remove('d-none');
-        elements.agentToggle.classList.add('active');
+        if (elements.agentToggle) {
+            elements.agentToggle.classList.add('active');
+        }
         // Ajustar el ancho del área de contenido principal
         if (window.innerWidth >= 768) {
             elements.mainContent.classList.remove('col-md-9', 'col-lg-10');
@@ -184,7 +210,9 @@ function toggleAgentSidebar() {
         }
     } else {
         elements.agentSidebar.classList.add('d-none');
-        elements.agentToggle.classList.remove('active');
+        if (elements.agentToggle) {
+            elements.agentToggle.classList.remove('active');
+        }
         // Restaurar el ancho del área de contenido principal
         if (window.innerWidth >= 768) {
             elements.mainContent.classList.remove('col-md-6', 'col-lg-7');
@@ -197,12 +225,21 @@ function toggleAgentSidebar() {
  * Muestra/oculta el panel de detalles completos de agentes
  */
 function toggleAgentDetailsPanel() {
+    // Verificar que el panel existe
+    if (!elements.agentDetailsPanel) {
+        console.warn('agentDetailsPanel no encontrado en el DOM');
+        return;
+    }
+    
     elements.agentDetailsPanel.classList.toggle('d-none');
     const isVisible = !elements.agentDetailsPanel.classList.contains('d-none');
     
-    elements.toggleDetailsBtn.innerHTML = isVisible ? 
-        '<i class="bi bi-eye-slash me-1"></i> Ocultar Detalles Completos' : 
-        '<i class="bi bi-info-circle me-1"></i> Ver Detalles Completos';
+    // Verificar que el botón existe
+    if (elements.toggleDetailsBtn) {
+        elements.toggleDetailsBtn.innerHTML = isVisible ? 
+            '<i class="bi bi-eye-slash me-1"></i> Ocultar Detalles Completos' : 
+            '<i class="bi bi-info-circle me-1"></i> Ver Detalles Completos';
+    }
 }
 
 /**
@@ -213,16 +250,21 @@ function toggleAgentDetailsPanel() {
 function updateAgentIndicator(agent, active) {
     appState.activeAgents[agent] = active;
     
-    if (active) {
-        elements.agentBadges[agent].classList.add('agent-active');
+    // Verificar que el badge del agente existe antes de modificarlo
+    if (elements.agentBadges[agent]) {
+        if (active) {
+            elements.agentBadges[agent].classList.add('agent-active');
+        } else {
+            elements.agentBadges[agent].classList.remove('agent-active');
+        }
     } else {
-        elements.agentBadges[agent].classList.remove('agent-active');
+        console.warn(`Badge para el agente ${agent} no encontrado`);
     }
 }
 
 /**
  * Actualiza el estado de un paso en la línea de tiempo
- * @param {string} step - ID del paso (retrieveContext, supervisor, etc)
+ * @param {string} step - ID del paso (retrieveContext, solution_architect, etc)
  * @param {string} status - Estado (pending, processing, completed, error)
  * @param {string} content - Contenido a mostrar
  */
@@ -233,9 +275,15 @@ function updateTimelineStep(step, status, content = '') {
         content: content || appState.processingSteps[step].content
     };
     
-    // Actualizar UI
+    // Verificar que los elementos existen antes de modificarlos
     const timelineItem = elements.timelineItems[step];
     const timelineContent = elements.timelineContents[step];
+    
+    // Salir si no existen los elementos necesarios
+    if (!timelineItem || !timelineContent) {
+        console.warn(`Elementos de timeline para el paso ${step} no encontrados`);
+        return;
+    }
     
     // Limpiar estados anteriores
     timelineItem.classList.remove('pending', 'processing', 'completed', 'error', 'active');
@@ -280,73 +328,115 @@ function updateTimelineStep(step, status, content = '') {
 }
 
 /**
- * Resetea todos los pasos de la línea de tiempo
+ * Restablece los pasos de la línea de tiempo a su estado inicial.
  */
 function resetTimelineSteps() {
-    updateTimelineStep('retrieveContext', 'pending');
-    updateTimelineStep('supervisor', 'pending');
-    updateTimelineStep('researcher', 'pending');
-    updateTimelineStep('analyst', 'pending');
-    updateTimelineStep('communicator', 'pending');
+    // Restablecer todos los pasos a pendiente
+    appState.processingSteps = {
+        retrieveContext: { status: 'pending', content: '' },
+        solution_architect: { status: 'pending', content: '' },
+        technical_research: { status: 'pending', content: '' },
+        code_review: { status: 'pending', content: '' },
+        project_management: { status: 'pending', content: '' },
+        market_analysis: { status: 'pending', content: '' },
+        data_analysis: { status: 'pending', content: '' },
+        client_communication: { status: 'pending', content: '' }
+    };
+    
+    // Actualizar la vista de la línea de tiempo
+    for (const [step, content] of Object.entries(elements.timelineContents)) {
+        if (content) {
+            content.innerHTML = '<div class="timeline-status">Pendiente</div>';
+            
+            // Eliminar clases de estado
+            const timelineItem = elements.timelineItems[step];
+            if (timelineItem) {
+                timelineItem.classList.remove('completed', 'in-progress', 'error');
+            }
+        }
+    }
 }
 
 /**
- * Resetea todos los indicadores de agentes a inactivo
+ * Restablece los indicadores de agentes a su estado inactivo.
  */
 function resetAgentIndicators() {
-    updateAgentIndicator('supervisor', false);
-    updateAgentIndicator('researcher', false);
-    updateAgentIndicator('analyst', false);
-    updateAgentIndicator('communicator', false);
+    // Restablecer el estado de activación de agentes
+    appState.activeAgents = {
+        solution_architect: false,
+        technical_research: false,
+        code_review: false,
+        project_management: false,
+        market_analysis: false,
+        data_analysis: false,
+        client_communication: false
+    };
+    
+    // Restablecer indicadores visuales
+    for (const [agentName, badge] of Object.entries(elements.agentBadges)) {
+        if (badge) {
+            const indicator = badge.querySelector('.agent-indicator');
+            if (indicator) {
+                indicator.classList.remove('active');
+            } else {
+                console.warn(`Indicador para el agente ${agentName} no encontrado`);
+            }
+        }
+    }
 }
 
 /**
  * Crea una nueva conversación.
  */
 function createNewConversation() {
-    // Generar ID para la conversación
-    const conversationId = Date.now().toString();
+    // Generar un ID único para la conversación
+    appState.currentConversationId = Date.now().toString(36) + Math.random().toString(36).substring(2);
     
-    // Crear objeto de conversación
-    const conversation = {
-        id: conversationId,
+    // Añadir la conversación a la lista
+    appState.conversations.push({
+        id: appState.currentConversationId,
         title: `Conversación ${appState.conversations.length + 1}`,
         timestamp: new Date().toISOString()
-    };
+    });
     
-    // Añadir a la lista de conversaciones
-    appState.conversations.unshift(conversation);
-    
-    // Establecer como conversación actual
-    appState.currentConversationId = conversationId;
-    appState.messages = [];
-    
-    // Actualizar UI
+    // Actualizar la lista de conversaciones
     updateConversationList();
+    
+    // Inicializar el chat con el mensaje de bienvenida
+    appState.messages = [{
+        type: 'system',
+        content: 'Bienvenido a la Consultora Tecnológica IA. ¿En qué proyecto puedo ayudarte hoy?',
+        timestamp: new Date().toISOString()
+    }];
+    
+    // Reiniciar la UI
     clearChatMessages();
     
-    // Añadir mensaje de bienvenida
-    addSystemMessage('Bienvenido al asistente de empresa con Agentes IA. ¿En qué puedo ayudarte hoy?');
+    const systemMessage = document.createElement('div');
+    systemMessage.className = 'system-message';
+    systemMessage.innerHTML = `
+        <div class="message-content">
+            <p>${appState.messages[0].content}</p>
+        </div>
+    `;
     
-    // Ocultar paneles
-    elements.workflowContainer.classList.add('d-none');
+    elements.chatMessages.appendChild(systemMessage);
+    
+    // Reiniciar los estados de los agentes
+    resetAgentIndicators();
+    resetTimelineSteps();
+    
+    // Ocultar paneles adicionales
     elements.agentDetailsPanel.classList.add('d-none');
     elements.documentContextPanel.classList.add('d-none');
     elements.agentToggle.classList.add('d-none');
     
-    // Reiniciar estado
-    resetAgentIndicators();
-    resetTimelineSteps();
-    
-    // Si está abierto el panel lateral, cerrarlo
     if (appState.sidebarVisible) {
         toggleAgentSidebar();
     }
     
-    // En móvil, cerrar el sidebar
-    if (window.innerWidth < 768) {
-        elements.sidebar.classList.remove('show');
-    }
+    // Enfocar el input
+    elements.userInput.focus();
 }
 
 /**
@@ -421,8 +511,8 @@ function clearChatMessages() {
 }
 
 /**
- * Maneja el envío de un mensaje.
- * @param {Event} event - Evento de submit
+ * Maneja el envío de mensajes.
+ * @param {Event} event - Evento de submit del formulario
  */
 function handleMessageSubmit(event) {
     event.preventDefault();
@@ -430,20 +520,57 @@ function handleMessageSubmit(event) {
     const message = elements.userInput.value.trim();
     if (!message || appState.isProcessing) return;
     
-    // Añadir mensaje del usuario a la UI
-    addUserMessage(message);
+    // Guardar el mensaje original
+    const sentMessage = message;
     
     // Limpiar campo de entrada
     elements.userInput.value = '';
     elements.userInput.style.height = 'auto';
     
-    // Procesar mensaje
-    processUserMessage(message);
+    // Añadir mensaje del usuario a la UI (guardar referencia al elemento)
+    const messageElement = addUserMessage(sentMessage);
+    
+    // Añadir el indicador de carga después del mensaje del usuario
+    const loadingElement = addLoadingIndicator();
+    
+    // Establecer estado de procesamiento
+    appState.isProcessing = true;
+    
+    // Procesar el mensaje de forma asíncrona
+    const processPromise = processUserMessage(sentMessage);
+    
+    // Manejar la finalización del procesamiento
+    processPromise
+        .then(() => {
+            // Procesamiento exitoso, el loadingElement ya debe haber sido eliminado
+            appState.isProcessing = false;
+        })
+        .catch(error => {
+            console.error('Error procesando mensaje:', error);
+            
+            // Asegurarse de que el mensaje del usuario sigue visible
+            if (!elements.chatMessages.contains(messageElement)) {
+                console.log("El mensaje del usuario desapareció, volviendo a añadir");
+                addUserMessage(sentMessage);
+            }
+            
+            // Eliminar el indicador de carga si aún existe
+            if (loadingElement && elements.chatMessages.contains(loadingElement)) {
+                loadingElement.remove();
+            }
+            
+            // Añadir mensaje de error
+            addSystemMessage(`Lo siento, ocurrió un error al procesar tu mensaje: ${error.message}`);
+            
+            // Asegurarse de resetear el estado de procesamiento
+            appState.isProcessing = false;
+        });
 }
 
 /**
  * Añade un mensaje del usuario a la UI.
  * @param {string} message - Texto del mensaje
+ * @returns {HTMLElement} Elemento del mensaje creado
  */
 function addUserMessage(message) {
     const messageElement = document.createElement('div');
@@ -470,6 +597,9 @@ function addUserMessage(message) {
         sender: 'user',
         timestamp: currentTime.toISOString()
     });
+    
+    // Devolver el elemento creado para referencias futuras
+    return messageElement;
 }
 
 /**
@@ -563,6 +693,7 @@ function scrollToBottom() {
 
 /**
  * Añade un indicador de carga.
+ * @returns {HTMLElement} Elemento del indicador creado
  */
 function addLoadingIndicator() {
     const loadingElement = document.createElement('div');
@@ -580,6 +711,9 @@ function addLoadingIndicator() {
     
     elements.chatMessages.appendChild(loadingElement);
     scrollToBottom();
+    
+    // Devolver el elemento para referencias futuras
+    return loadingElement;
 }
 
 /**
@@ -588,12 +722,6 @@ function addLoadingIndicator() {
  */
 async function processUserMessage(message) {
     try {
-        // Iniciar procesamiento
-        appState.isProcessing = true;
-        
-        // Mostrar indicador de carga
-        addLoadingIndicator();
-        
         // Mostrar el botón de agentes
         elements.agentToggle.classList.remove('d-none');
         
@@ -613,6 +741,19 @@ async function processUserMessage(message) {
             sender: msg.sender
         }));
         
+        console.log("Enviando consulta:", message);
+        console.log("Contexto enviado:", context);
+        
+        // Verificar si podemos conectarnos al servidor (nueva comprobación)
+        try {
+            const healthCheck = await fetch('/health', { method: 'GET' });
+            if (!healthCheck.ok) {
+                console.warn("El servidor podría no estar disponible:", await healthCheck.text());
+            }
+        } catch (healthErr) {
+            console.warn("No se puede contactar al servidor, pero continuaremos el intento:", healthErr);
+        }
+        
         // Enviar solicitud al servidor
         const response = await fetch('/api/query', {
             method: 'POST',
@@ -625,11 +766,43 @@ async function processUserMessage(message) {
             })
         });
         
+        console.log("Estado de respuesta:", response.status);
+        
+        // Manejo detallado de errores HTTP
         if (!response.ok) {
-            throw new Error('Error al procesar la consulta');
+            let errorText = '';
+            try {
+                const errorData = await response.json();
+                errorText = errorData.detail || JSON.stringify(errorData);
+            } catch {
+                errorText = await response.text();
+            }
+            console.error("Error del servidor:", errorText);
+            throw new Error(`Error del servidor (${response.status}): ${errorText}`);
         }
         
         const data = await response.json();
+        console.log("Datos recibidos:", data);
+        
+        // Si no hay respuesta, mostrar un error amigable
+        if (!data || typeof data !== 'object') {
+            console.error("Respuesta inválida del servidor:", data);
+            throw new Error('Respuesta del servidor inválida o vacía');
+        }
+        
+        if (!data.response) {
+            console.error("La respuesta no contiene el campo 'response':", data);
+            
+            // Fallback - crear una respuesta basada en cualquier agente disponible
+            if (data.agent_responses && Object.keys(data.agent_responses).length > 0) {
+                const firstAgent = Object.keys(data.agent_responses)[0];
+                data.response = data.agent_responses[firstAgent].content || 
+                                "No se encontró una respuesta específica, pero los agentes han procesado tu consulta.";
+                console.log("Respuesta fallback creada:", data.response);
+            } else {
+                data.response = "No se pudo procesar tu mensaje correctamente. Por favor, intenta con una consulta diferente.";
+            }
+        }
         
         // Actualizar estado de recuperación de contexto
         if (data.context_documents && data.context_documents.length > 0) {
@@ -645,114 +818,157 @@ async function processUserMessage(message) {
         }
         
         // Procesar respuestas de los agentes
-        updateAgentResponses(data.agent_responses);
+        if (data.agent_responses) {
+            updateAgentResponses(data.agent_responses);
+        } else {
+            console.warn("No se recibieron respuestas de agentes");
+            // Mostrar un mensaje de recuperación
+            updateTimelineStep('solution_architect', 'completed', 'Evaluación de arquitectura completada');
+            updateTimelineStep('client_communication', 'completed', 'Comunicación preparada');
+        }
+        
+        // Eliminar el indicador de carga (podría estar ya eliminado)
+        const loadingIndicator = document.querySelector('.loading-indicator');
+        if (loadingIndicator) {
+            loadingIndicator.remove();
+        }
         
         // Añadir respuesta del asistente
-        addAIMessage(data.response, Object.values(data.agent_responses).flatMap(ar => ar.sources || []));
+        addAIMessage(data.response, 
+            data.agent_responses ? Object.values(data.agent_responses).flatMap(ar => ar.sources || []) : []);
         
     } catch (error) {
-        console.error('Error:', error);
-        addSystemMessage(`Error: ${error.message}`);
+        console.error('Error en processUserMessage:', error);
         
         // Marcar error en todos los pasos pendientes
         Object.keys(appState.processingSteps).forEach(step => {
-            if (appState.processingSteps[step].status === 'processing') {
-                updateTimelineStep(step, 'error', error.message);
+            if (appState.processingSteps[step].status === 'processing' || 
+                appState.processingSteps[step].status === 'pending') {
+                updateTimelineStep(step, 'error', 'Error de procesamiento');
             }
         });
         
         // Desactivar todos los indicadores
         resetAgentIndicators();
         
-    } finally {
-        // Finalizar procesamiento
-        appState.isProcessing = false;
+        // Propagar el error para que lo maneje handleMessageSubmit
+        throw error;
     }
 }
 
 /**
- * Actualiza las respuestas de los agentes en la UI y línea de tiempo
+ * Actualiza las respuestas de los agentes en el panel de detalles.
+ * 
  * @param {Object} agentResponses - Respuestas de los agentes
  */
 function updateAgentResponses(agentResponses) {
-    // Limpiar paneles
-    Object.values(elements.agentPanels).forEach(panel => {
-        panel.innerHTML = '';
-    });
+    resetTimelineSteps();
+    resetAgentIndicators();
     
-    console.log("Respuestas de agentes recibidas:", agentResponses);
+    // Lista de todos los agentes para asegurar que todos tengan algún estado
+    const allAgents = [
+        'solution_architect', 
+        'technical_research', 
+        'code_review', 
+        'project_management', 
+        'market_analysis', 
+        'data_analysis', 
+        'client_communication'
+    ];
     
-    // Verificar estructura de la respuesta y normalizar nombre de roles
-    const normalizedResponses = {};
+    // Recopilar todos los agentes que han respondido
+    const respondedAgents = new Set(Object.keys(agentResponses).map(role => {
+        // Convertir los nombres antiguos al nuevo formato si es necesario
+        if (role === 'supervisor') return 'solution_architect';
+        if (role === 'researcher') return 'technical_research';
+        if (role === 'analyst') return 'code_review';
+        if (role === 'communicator') return 'client_communication';
+        return role;
+    }));
+    
+    // Actualizar el paso de recuperación de contexto
+    updateTimelineStep('retrieveContext', 'completed', 'Contexto recuperado correctamente.');
+    
+    // Procesar las respuestas de agentes que han respondido
     for (const [role, response] of Object.entries(agentResponses)) {
-        // Convertir a minúsculas para normalizar
-        let normalizedRole = role.toLowerCase();
-        // Manejar casos como "SUPERVISOR", "Supervisor", etc.
-        if (normalizedRole.includes('supervisor')) normalizedRole = 'supervisor';
-        if (normalizedRole.includes('researcher') || normalizedRole.includes('investigador')) normalizedRole = 'researcher';
-        if (normalizedRole.includes('analyst') || normalizedRole.includes('analista')) normalizedRole = 'analyst';
-        if (normalizedRole.includes('communicator') || normalizedRole.includes('comunicador')) normalizedRole = 'communicator';
+        let agentName = role;
         
-        normalizedResponses[normalizedRole] = response;
+        // Convertir los nombres antiguos al nuevo formato si es necesario
+        if (role === 'supervisor') agentName = 'solution_architect';
+        if (role === 'researcher') agentName = 'technical_research';
+        if (role === 'analyst') agentName = 'code_review';
+        if (role === 'communicator') agentName = 'client_communication';
+        
+        // Ignorar roles que no tenemos en nuestra interfaz
+        if (!appState.processingSteps[agentName]) continue;
+        
+        // Marcar el agente como activo
+        appState.activeAgents[agentName] = true;
+        
+        // Actualizar el paso del timeline
+        updateTimelineStep(agentName, 'completed', response.content);
+        
+        // Actualizar el contenido del panel
+        if (elements.agentPanels[agentName]) {
+            elements.agentPanels[agentName].innerHTML = `
+                <div class="agent-response">
+                    <p class="response-text">${response.content}</p>
+                    ${response.sources && response.sources.length > 0 ? `
+                        <div class="response-sources">
+                            <h6>Fuentes:</h6>
+                            <ul>
+                                ${response.sources.map(source => `<li>${source}</li>`).join('')}
+                            </ul>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        } else {
+            console.warn(`Panel para el agente ${agentName} no encontrado`);
+        }
+        
+        // Actualizar el indicador de agente
+        if (elements.agentBadges[agentName]) {
+            const indicator = elements.agentBadges[agentName].querySelector('.agent-indicator');
+            if (indicator) {
+                indicator.classList.add('active');
+            } else {
+                console.warn(`Indicador para el agente ${agentName} no encontrado`);
+            }
+        } else {
+            console.warn(`Badge para el agente ${agentName} no encontrado`);
+        }
     }
     
-    console.log("Respuestas normalizadas:", normalizedResponses);
-    
-    // Actualizar cada panel de agente
-    const roleMapping = {
-        'supervisor': { id: 'supervisor', title: 'Evaluando la consulta...' },
-        'researcher': { id: 'researcher', title: 'Investigando información...' },
-        'analyst': { id: 'analyst', title: 'Analizando resultados...' },
-        'communicator': { id: 'communicator', title: 'Formulando respuesta final...' }
-    };
-    
-    // Actualizar los pasos de la línea de tiempo para todos los agentes presentes en la respuesta
-    Object.entries(roleMapping).forEach(([role, info], index) => {
-        const response = normalizedResponses[role] || agentResponses[role.toUpperCase()];
-        
-        if (response) {
-            const timelineId = info.id;
-            const panelId = info.id;
-            const delay = 1000 + (index * 500); // Escalonamiento en la animación
-            
-            // Actualizar el estado a "procesando"
-            updateTimelineStep(timelineId, 'processing', info.title);
-            updateAgentIndicator(panelId, true);
-            
-            // Simular el tiempo de procesamiento y luego marcar como completado
-            setTimeout(() => {
-                updateTimelineStep(timelineId, 'completed', response.content);
-                updateAgentIndicator(panelId, false);
+    // Manejar agentes que no han respondido (estado pendiente o ignorado)
+    for (const agentName of allAgents) {
+        if (!respondedAgents.has(agentName)) {
+            // Si es el revisor de código, proporcionar una respuesta genérica útil
+            if (agentName === 'code_review' && elements.agentPanels[agentName]) {
+                updateTimelineStep(agentName, 'completed', 'No se detectó código para revisar en esta consulta.');
                 
-                // Formatear contenido con markdown básico para el panel de detalles
-                const formattedContent = response.content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                                                   .replace(/\*(.*?)\*/g, '<em>$1</em>')
-                                                   .replace(/```(.*?)```/gs, '<pre><code>$1</code></pre>')
-                                                   .replace(/`(.*?)`/g, '<code>$1</code>')
-                                                   .replace(/\n/g, '<br>');
-                
-                // Añadir fuentes si hay
-                let sourcesHTML = '';
-                if (response.sources && response.sources.length > 0) {
-                    sourcesHTML = '<div class="mt-3"><strong>Fuentes:</strong><ul>';
-                    response.sources.forEach(source => {
-                        if (source && source !== 'undefined') {
-                            sourcesHTML += `<li><a href="#" onclick="viewDocument('${source}'); return false;">${source}</a></li>`;
-                        }
-                    });
-                    sourcesHTML += '</ul></div>';
+                elements.agentPanels[agentName].innerHTML = `
+                    <div class="agent-response">
+                        <p class="response-text">No se detectó código específico para revisar en esta consulta. Para utilizar el revisor de código, puedes compartir fragmentos de código o hacer preguntas relacionadas con desarrollo de software.</p>
+                        <div class="code-review-tip">
+                            <h6>Sugerencia:</h6>
+                            <p>Prueba con preguntas como "¿Puedes revisar este código: function suma(a, b) { return a + b; }?" o "¿Cómo mejorarías esta consulta SQL?"</p>
+                        </div>
+                    </div>
+                `;
+            } else {
+                // Para otros agentes, simplemente marcarlos como pendientes o ignorados
+                if (appState.processingSteps[agentName]) {
+                    updateTimelineStep(agentName, 'pending', 'Agente no activado para esta consulta');
                 }
-                
-                // Actualizar panel de detalles
-                if (elements.agentPanels[panelId]) {
-                    elements.agentPanels[panelId].innerHTML = `
-                        <div>${formattedContent}</div>
-                        ${sourcesHTML}
-                    `;
-                }
-            }, delay);
+            }
         }
-    });
+    }
+    
+    // Hacer visible el botón de alternancia de agentes
+    if (elements.agentToggle) {
+        elements.agentToggle.classList.remove('d-none');
+    }
 }
 
 /**

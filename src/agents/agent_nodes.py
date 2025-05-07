@@ -49,21 +49,21 @@ class AgentNodes:
             
         return state
         
-    def supervisor_agent(self, state: GraphState) -> GraphState:
-        """Supervisor agent to coordinate the workflow.
+    def solution_architect_agent(self, state: GraphState) -> GraphState:
+        """Solution Architect agent to evaluate technical requirements and design solutions.
         
         Args:
             state: Current graph state
             
         Returns:
-            Updated graph state with supervisor response
+            Updated graph state with solution architect response
         """
         # Set current agent
-        state.current_agent = AgentRole.SUPERVISOR
+        state.current_agent = AgentRole.SOLUTION_ARCHITECT
         
-        # Create prompt for supervisor
+        # Create prompt for solution architect
         prompt = create_agent_prompt(
-            AgentRole.SUPERVISOR,
+            AgentRole.SOLUTION_ARCHITECT,
             state.human_query or "",
             state.messages,
             state.context
@@ -78,26 +78,26 @@ class AgentNodes:
         # Create agent response
         agent_response = create_agent_response(
             content=response,
-            agent_role=AgentRole.SUPERVISOR,
+            agent_role=AgentRole.SOLUTION_ARCHITECT,
             sources=[doc.id for doc in state.context],
         )
         
         # Update state
-        state.agent_responses[AgentRole.SUPERVISOR] = agent_response
+        state.agent_responses[AgentRole.SOLUTION_ARCHITECT] = agent_response
         
         return state
         
-    def researcher_agent(self, state: GraphState) -> GraphState:
-        """Researcher agent with external knowledge capabilities.
+    def technical_research_agent(self, state: GraphState) -> GraphState:
+        """Technical Research agent with external knowledge capabilities.
         
         Args:
             state: Current graph state
             
         Returns:
-            Updated graph state with researcher response
+            Updated graph state with technical research response
         """
         # Set current agent
-        state.current_agent = AgentRole.RESEARCHER
+        state.current_agent = AgentRole.TECHNICAL_RESEARCH
         
         # Check if we need external knowledge
         external_docs = self._process_external_knowledge(state.human_query)
@@ -114,9 +114,9 @@ class AgentNodes:
             )
             state.messages.append(system_msg)
         
-        # Create prompt for researcher
+        # Create prompt for technical research
         prompt = create_agent_prompt(
-            AgentRole.RESEARCHER,
+            AgentRole.TECHNICAL_RESEARCH,
             state.human_query or "",
             state.messages,
             state.context
@@ -131,12 +131,12 @@ class AgentNodes:
         # Create agent response
         agent_response = create_agent_response(
             content=response,
-            agent_role=AgentRole.RESEARCHER,
+            agent_role=AgentRole.TECHNICAL_RESEARCH,
             sources=[doc.id for doc in state.context],
         )
         
         # Update state
-        state.agent_responses[AgentRole.RESEARCHER] = agent_response
+        state.agent_responses[AgentRole.TECHNICAL_RESEARCH] = agent_response
         
         return state
         
@@ -187,6 +187,17 @@ class AgentNodes:
                 news_doc = self.external_knowledge.get_news(entities["topic"])
                 external_docs.append(news_doc)
         
+        # Check for technical stack intent
+        if any(intent in ["technology", "stack", "framework", "library", "tool"] for intent in intents):
+            if "topic" in entities:
+                logger.info(f"Getting technical information for: {entities['topic']}")
+                wiki_doc = self.external_knowledge.query_wikipedia(f"{entities['topic']} technology")
+                external_docs.append(wiki_doc)
+                
+                # Also get news about this technology
+                news_doc = self.external_knowledge.get_news(f"{entities['topic']} technology")
+                external_docs.append(news_doc)
+        
         return external_docs
     
     def _extract_entities(self, query: str) -> Dict[str, str]:
@@ -204,6 +215,9 @@ class AgentNodes:
         - location: any location mentioned (city, country, etc.)
         - topic: main topic, concept, or subject to search information about
         - time_period: any time period mentioned
+        - technology: any technology, framework, or technical concept mentioned
+        - language: programming languages mentioned
+        - project_type: type of project discussed (web, mobile, AI, etc.)
         
         Query: {query}
         
@@ -235,6 +249,15 @@ class AgentNodes:
                 if len(parts) > 1:
                     entities["topic"] = parts[1].strip()
             
+            # Simple technology detection
+            tech_keywords = ["python", "javascript", "react", "angular", "vue", "django", "flask", 
+                           "node", "java", "spring", "docker", "kubernetes", "aws", "azure", 
+                           "google cloud", "ai", "machine learning", "ml", "deep learning"]
+            for tech in tech_keywords:
+                if tech.lower() in query.lower():
+                    entities["technology"] = tech
+                    break
+            
             return entities
     
     def _extract_intents(self, query: str) -> List[str]:
@@ -248,58 +271,74 @@ class AgentNodes:
         """
         # Simple keyword-based intent detection
         intents = []
+        query_lower = query.lower()
         
-        # Weather intent
-        weather_keywords = ["weather", "clima", "temperatura", "forecast", "lluvia", "sol"]
-        if any(keyword in query.lower() for keyword in weather_keywords):
-            intents.append("weather")
+        # Technology intents
+        if any(word in query_lower for word in ["technology", "tech stack", "framework", "library", "programming"]):
+            intents.append("technology")
+            
+        # Project management intents
+        if any(word in query_lower for word in ["timeline", "estimate", "project plan", "schedule", "team", "resources"]):
+            intents.append("project_management")
+            
+        # Code review intents - AMPLIADOS
+        code_keywords = ["code", "review", "bug", "issue", "error", "refactor", "function", "class", 
+                         "variable", "algorithm", "programming", "developer", "debugging", "test", 
+                         "python", "javascript", "java", "c++", "html", "css", "json", "api", 
+                         "frontend", "backend", "desarrollador", "código", "función"]
+                         
+        if any(word in query_lower for word in code_keywords) or any(symbol in query for symbol in ["()", "{}", "[]", ";"]):
+            intents.append("code_review")
+            
+        # Detección de fragmentos de código
+        code_patterns = [
+            "```", "def ", "function(", "class ", "import ", "from ", "var ", "let ", "const ", 
+            "for(", "while(", "if(", "else{", "return ", "public ", "private "
+        ]
         
-        # Wikipedia/information intent
-        wiki_keywords = ["what is", "definition", "información sobre", "qué es", "tell me about", "wiki"]
-        if any(keyword in query.lower() for keyword in wiki_keywords):
+        if any(pattern in query for pattern in code_patterns):
+            intents.append("code_review")
+            
+        # Market analysis intents
+        if any(word in query_lower for word in ["market", "competitor", "trend", "industry", "adoption"]):
+            intents.append("market_analysis")
+            
+        # Data analysis intents
+        if any(word in query_lower for word in ["data", "analytics", "metrics", "statistics", "dashboard"]):
+            intents.append("data_analysis")
+        
+        # Information intents (for Wikipedia, etc.)
+        if any(word in query_lower for word in ["what is", "definition", "explain", "how does", "information about"]):
             intents.append("information")
-        
-        # News intent
-        news_keywords = ["news", "noticias", "current events", "actualidad", "últimas noticias"]
-        if any(keyword in query.lower() for keyword in news_keywords):
+            
+        # Weather intents
+        if any(word in query_lower for word in ["weather", "temperature", "climate", "forecast"]):
+            intents.append("weather")
+            
+        # News intents
+        if any(word in query_lower for word in ["news", "latest", "recent", "update", "current events"]):
             intents.append("news")
-        
+            
         return intents
-        
-    def analyst_agent(self, state: GraphState) -> GraphState:
-        """Analyst agent to analyze information.
+    
+    def project_management_agent(self, state: GraphState) -> GraphState:
+        """Project Management agent for estimating timelines and resources.
         
         Args:
             state: Current graph state
             
         Returns:
-            Updated graph state with analyst response
+            Updated graph state with project management response
         """
         # Set current agent
-        state.current_agent = AgentRole.ANALYST
+        state.current_agent = AgentRole.PROJECT_MANAGEMENT
         
-        # Create context including researcher's findings
-        context = state.context.copy()
-        
-        # Add researcher response as additional context if available
-        researcher_response = state.agent_responses.get(AgentRole.RESEARCHER)
-        if researcher_response:
-            from src.models.class_models import CompanyDocument
-            researcher_doc = CompanyDocument(
-                id="researcher_analysis",
-                title="Researcher Agent Analysis",
-                content=researcher_response.content,
-                document_type="agent_response",
-                source="researcher_agent"
-            )
-            context.append(researcher_doc)
-        
-        # Create prompt for analyst
+        # Create prompt for project management
         prompt = create_agent_prompt(
-            AgentRole.ANALYST,
+            AgentRole.PROJECT_MANAGEMENT,
             state.human_query or "",
             state.messages,
-            context
+            state.context
         )
         
         # Get response from LLM
@@ -311,33 +350,148 @@ class AgentNodes:
         # Create agent response
         agent_response = create_agent_response(
             content=response,
-            agent_role=AgentRole.ANALYST,
+            agent_role=AgentRole.PROJECT_MANAGEMENT,
             sources=[doc.id for doc in state.context],
         )
         
         # Update state
-        state.agent_responses[AgentRole.ANALYST] = agent_response
+        state.agent_responses[AgentRole.PROJECT_MANAGEMENT] = agent_response
         
         return state
-        
-    def communicator_agent(self, state: GraphState) -> GraphState:
-        """Communicator agent to create the final response.
+    
+    def code_review_agent(self, state: GraphState) -> GraphState:
+        """Code Review agent for analyzing code quality and suggesting improvements.
         
         Args:
             state: Current graph state
             
         Returns:
-            Updated graph state with final response
+            Updated graph state with code review response
         """
         # Set current agent
-        state.current_agent = AgentRole.COMMUNICATOR
+        state.current_agent = AgentRole.CODE_REVIEW
         
-        # Create context including all agent responses
+        # Create prompt for code review
+        prompt = create_agent_prompt(
+            AgentRole.CODE_REVIEW,
+            state.human_query or "",
+            state.messages,
+            state.context
+        )
+        
+        # Get response from LLM
+        chain = self.llm_service.create_chain(
+            "{input}",
+        )
+        response = chain.invoke({"input": prompt})
+        
+        # Create agent response
+        agent_response = create_agent_response(
+            content=response,
+            agent_role=AgentRole.CODE_REVIEW,
+            sources=[doc.id for doc in state.context],
+        )
+        
+        # Update state
+        state.agent_responses[AgentRole.CODE_REVIEW] = agent_response
+        
+        return state
+    
+    def market_analysis_agent(self, state: GraphState) -> GraphState:
+        """Market Analysis agent for analyzing technology trends and competition.
+        
+        Args:
+            state: Current graph state
+            
+        Returns:
+            Updated graph state with market analysis response
+        """
+        # Set current agent
+        state.current_agent = AgentRole.MARKET_ANALYSIS
+        
+        # Create prompt for market analysis
+        prompt = create_agent_prompt(
+            AgentRole.MARKET_ANALYSIS,
+            state.human_query or "",
+            state.messages,
+            state.context
+        )
+        
+        # Get response from LLM
+        chain = self.llm_service.create_chain(
+            "{input}",
+        )
+        response = chain.invoke({"input": prompt})
+        
+        # Create agent response
+        agent_response = create_agent_response(
+            content=response,
+            agent_role=AgentRole.MARKET_ANALYSIS,
+            sources=[doc.id for doc in state.context],
+        )
+        
+        # Update state
+        state.agent_responses[AgentRole.MARKET_ANALYSIS] = agent_response
+        
+        return state
+    
+    def data_analysis_agent(self, state: GraphState) -> GraphState:
+        """Data Analysis agent for interpreting data and extracting insights.
+        
+        Args:
+            state: Current graph state
+            
+        Returns:
+            Updated graph state with data analysis response
+        """
+        # Set current agent
+        state.current_agent = AgentRole.DATA_ANALYSIS
+        
+        # Create prompt for data analysis
+        prompt = create_agent_prompt(
+            AgentRole.DATA_ANALYSIS,
+            state.human_query or "",
+            state.messages,
+            state.context
+        )
+        
+        # Get response from LLM
+        chain = self.llm_service.create_chain(
+            "{input}",
+        )
+        response = chain.invoke({"input": prompt})
+        
+        # Create agent response
+        agent_response = create_agent_response(
+            content=response,
+            agent_role=AgentRole.DATA_ANALYSIS,
+            sources=[doc.id for doc in state.context],
+        )
+        
+        # Update state
+        state.agent_responses[AgentRole.DATA_ANALYSIS] = agent_response
+        
+        return state
+    
+    def client_communication_agent(self, state: GraphState) -> GraphState:
+        """Client Communication agent for crafting clear, professional responses.
+        
+        Args:
+            state: Current graph state
+            
+        Returns:
+            Updated graph state with client communication response
+        """
+        # Set current agent
+        state.current_agent = AgentRole.CLIENT_COMMUNICATION
+        
+        # Prepare context from other agent responses for comprehensive communication
         from src.models.class_models import CompanyDocument
-        context = []
+        context = state.context.copy()
         
+        # Add responses from other agents as context
         for role, response in state.agent_responses.items():
-            if role != AgentRole.COMMUNICATOR:  # Avoid circular reference
+            if role != AgentRole.CLIENT_COMMUNICATION:  # Avoid circular reference
                 agent_doc = CompanyDocument(
                     id=f"{role.value}_analysis",
                     title=f"{role.value.capitalize()} Agent Analysis",
@@ -347,12 +501,9 @@ class AgentNodes:
                 )
                 context.append(agent_doc)
         
-        # Add original context documents
-        context.extend(state.context)
-        
-        # Create prompt for communicator
+        # Create prompt for client communication
         prompt = create_agent_prompt(
-            AgentRole.COMMUNICATOR,
+            AgentRole.CLIENT_COMMUNICATION,
             state.human_query or "",
             state.messages,
             context
@@ -367,12 +518,11 @@ class AgentNodes:
         # Create agent response
         agent_response = create_agent_response(
             content=response,
-            agent_role=AgentRole.COMMUNICATOR,
+            agent_role=AgentRole.CLIENT_COMMUNICATION,
             sources=[doc.id for doc in state.context],
         )
         
-        # Update state
-        state.agent_responses[AgentRole.COMMUNICATOR] = agent_response
+        # Set final response in state
         state.final_response = response
         
         # Add AI message to conversation history
@@ -383,170 +533,191 @@ class AgentNodes:
         )
         state.messages.append(ai_msg)
         
+        # Update state
+        state.agent_responses[AgentRole.CLIENT_COMMUNICATION] = agent_response
+        
         return state
     
-    def should_use_analyst(self, state: GraphState) -> str:
-        """Decide whether to use the analyst agent.
+    def should_use_code_review(self, state: GraphState) -> str:
+        """Determine if the Code Review agent should be used.
         
         Args:
             state: Current graph state
             
         Returns:
-            Decision: "use_analyst" or "skip_analyst"
+            Decision string ('use_code_review' or 'skip_code_review')
         """
-        # Simple logic: if we have researcher response, use analyst
-        if AgentRole.RESEARCHER in state.agent_responses:
-            return "use_analyst"
+        # Extraer los intents de la consulta
+        intents = self._extract_intents(state.human_query or "")
         
-        return "skip_analyst"
+        # Buscar palabras clave técnicas en la consulta
+        query_lower = (state.human_query or "").lower()
+        technical_keywords = ["develop", "programm", "cod", "software", "app", "application", 
+                             "framework", "library", "function", "algorithm", "api", "database",
+                             "backend", "frontend", "full-stack", "system"]
+        
+        # Activar el revisor de código si:
+        # 1. Hay intent de code_review
+        # 2. O es una consulta relacionada con tecnología
+        # 3. O contiene alguna palabra clave técnica
+        # 4. O la consulta está en nuestra lista de preguntas de prueba para revisor de código
+        # 5. O es una consulta compleja técnica
+        if ("code_review" in intents or
+            "technology" in intents or
+            any(keyword in query_lower for keyword in technical_keywords) or
+            len(query_lower) > 200):  # Para consultas largas y complejas que pueden contener aspectos técnicos
+            
+            print("Activando revisor de código para la consulta:", state.human_query)
+            return "use_code_review"
+        else:
+            return "skip_code_review"
+    
+    def should_use_project_management(self, state: GraphState) -> str:
+        """Determine if the Project Management agent should be used.
+        
+        Args:
+            state: Current graph state
+            
+        Returns:
+            Decision string ('use_project_management' or 'skip_project_management')
+        """
+        intents = self._extract_intents(state.human_query or "")
+        
+        if "project_management" in intents:
+            return "use_project_management"
+        else:
+            return "skip_project_management"
+    
+    def should_use_market_analysis(self, state: GraphState) -> str:
+        """Determine if the Market Analysis agent should be used.
+        
+        Args:
+            state: Current graph state
+            
+        Returns:
+            Decision string ('use_market_analysis' or 'skip_market_analysis')
+        """
+        intents = self._extract_intents(state.human_query or "")
+        
+        if "market_analysis" in intents:
+            return "use_market_analysis"
+        else:
+            return "skip_market_analysis"
+    
+    def should_use_data_analysis(self, state: GraphState) -> str:
+        """Determine if the Data Analysis agent should be used.
+        
+        Args:
+            state: Current graph state
+            
+        Returns:
+            Decision string ('use_data_analysis' or 'skip_data_analysis')
+        """
+        intents = self._extract_intents(state.human_query or "")
+        
+        if "data_analysis" in intents:
+            return "use_data_analysis"
+        else:
+            return "skip_data_analysis"
     
     def process_user_query(self, query: str, conversation_history: Optional[List[Dict]] = None) -> Dict[str, Any]:
         """Process a user query through the agent workflow.
         
         Args:
-            query: User query text
-            conversation_history: Optional previous conversation history
+            query: User query string
+            conversation_history: Optional list of previous messages
             
         Returns:
-            Final state after processing
+            Result dictionary with agent responses and final response
         """
         from src.graph.agent_graph import create_agent_graph
         import logging
         
         logger = logging.getLogger(__name__)
         
+        # Create agent graph
+        graph = create_agent_graph(self)
+        
         # Initialize messages from conversation history
         messages = []
         if conversation_history:
             for msg in conversation_history:
-                msg_type = MessageType(msg.get("type", "human"))
+                message_type = MessageType(msg.get("type", "human"))
                 messages.append(create_message(
                     msg.get("content", ""),
-                    msg_type,
+                    message_type,
                     msg.get("sender")
                 ))
         
-        # Add the new human message
-        human_msg = create_message(
-            query,
-            MessageType.HUMAN,
-            "user"
-        )
-        messages.append(human_msg)
-        
         # Create initial state
-        initial_state = GraphState(
+        state = GraphState(
             messages=messages,
             human_query=query
         )
         
-        # Get agent graph
-        agent_graph = create_agent_graph(self)
-        
-        # Run the graph with initial state
-        result = agent_graph.invoke(initial_state)
-        
-        # Log the type of result we got
-        logger.info(f"Graph result type: {type(result)}")
-        
-        # Respuesta por defecto en caso de que no se pueda extraer
-        default_response = "¡Hola! Soy el asistente de empresa con Agentes IA. ¿En qué puedo ayudarte hoy?"
-        if "hola" in query.lower():
-            final_response = default_response
-        else:
-            final_response = "Lo siento, no pude procesar tu consulta correctamente. Por favor, intenta ser más específico o reformula tu pregunta."
-        
-        agent_responses = {}
-        context_docs = []
-        
+        # Run the workflow
         try:
-            # Imprimir la estructura completa del resultado para diagnóstico
-            logger.info(f"Result structure: {repr(result)[:200]}...")
+            result = graph.invoke(state)
+            logger.info("Graph execution completed successfully")
             
-            # Extract directly from the AddableValuesDict if possible
-            found_response = False
-            
-            # Método 1: Usar values() si es callable
-            if hasattr(result, "values") and callable(result.values):
-                logger.info("Extracting values from AddableValuesDict")
-                values_dict = result.values()
+            # Check if result is an AddableValuesDict
+            if hasattr(result, "get"):
+                logger.info("Result is an AddableValuesDict, extracting values")
+                # Try to extract client_communication agent's response as final response
+                agent_responses = {}
+                final_response = None
+                context = []
                 
-                # El objeto values_dict es de tipo dict_values, intentamos extraer usando nombres conocidos
-                values_list = list(values_dict)
-                if values_list:
-                    logger.info(f"Values list first element type: {type(values_list[0])}")
+                # Extract agent responses if available
+                if hasattr(result, "agent_responses") or (hasattr(result, "get") and result.get("agent_responses")):
+                    agent_responses = result.agent_responses if hasattr(result, "agent_responses") else result.get("agent_responses", {})
                     
-                    # Si el primer elemento es un diccionario, intenta extraer directamente
-                    if values_list and isinstance(values_list[0], dict):
-                        for value_dict in values_list:
-                            if "agent_responses" in value_dict:
-                                agent_responses = value_dict["agent_responses"]
-                                
-                                # Get final response from communicator
-                                if AgentRole.COMMUNICATOR in agent_responses:
-                                    final_response = agent_responses[AgentRole.COMMUNICATOR].content
-                                    found_response = True
-                                    logger.info(f"Found communicator response in values dict: {final_response[:50]}...")
-                            
-                            if "context" in value_dict:
-                                context_docs = value_dict["context"]
-            
-            # Método 2: Acceso directo a atributos
-            if not found_response and hasattr(result, "agent_responses"):
-                agent_responses = result.agent_responses
+                    # Get final response from client communication agent
+                    if AgentRole.CLIENT_COMMUNICATION in agent_responses:
+                        final_response = agent_responses[AgentRole.CLIENT_COMMUNICATION].content
                 
-                if AgentRole.COMMUNICATOR in agent_responses:
-                    final_response = agent_responses[AgentRole.COMMUNICATOR].content
-                    found_response = True
-                    logger.info(f"Found communicator response in attributes: {final_response[:50]}...")
-                    
-                if hasattr(result, "context"):
-                    context_docs = result.context
-            
-            # Método 3: Probar atributos conocidos específicos de LangGraph
-            if not found_response and hasattr(result, "get"):
-                try:
-                    # Intenta obtener directamente los resultados usando get
-                    logger.info("Trying to extract using get method")
-                    
-                    # Intenta con diferentes posibles nombres de clave
-                    for key in ["final_response", "response", "communicator", "output"]:
-                        try:
-                            value = result.get(key)
-                            if value and isinstance(value, str):
-                                final_response = value
-                                found_response = True
-                                logger.info(f"Found response using get({key}): {final_response[:50]}...")
-                                break
-                        except:
-                            pass
-                    
-                    # Intenta obtener agent_responses
-                    if hasattr(result, "get") and not agent_responses:
-                        try:
-                            responses = result.get("agent_responses")
-                            if responses:
-                                agent_responses = responses
-                            
-                                # Intenta obtener la respuesta final
-                                if not found_response and AgentRole.COMMUNICATOR in agent_responses:
-                                    final_response = agent_responses[AgentRole.COMMUNICATOR].content
-                                    found_response = True
-                        except:
-                            pass
-                except Exception as e:
-                    logger.error(f"Error using get method: {str(e)}")
-            
-            logger.info(f"Final response extracted: {final_response[:50]}...")
-            
+                # Extract context if available
+                if hasattr(result, "context") or (hasattr(result, "get") and result.get("context")):
+                    context = result.context if hasattr(result, "context") else result.get("context", [])
+                
+                # Extract final_response if not already set
+                if final_response is None and (hasattr(result, "final_response") or (hasattr(result, "get") and result.get("final_response"))):
+                    final_response = result.final_response if hasattr(result, "final_response") else result.get("final_response")
+                
+                # Fallback response if still not set
+                if not final_response:
+                    logger.warning("No final response available, using fallback")
+                    if agent_responses and len(agent_responses) > 0:
+                        # Use the last agent's response as fallback
+                        last_agent = list(agent_responses.values())[-1]
+                        final_response = last_agent.content
+                    else:
+                        final_response = "Lo siento, no pude generar una respuesta específica para tu consulta. Por favor intenta reformular tu pregunta."
+                
+                return {
+                    "final_response": final_response,
+                    "agent_responses": agent_responses,
+                    "context": context
+                }
+            else:
+                # Traditional access pattern if result is as expected
+                final_response = result.final_response if hasattr(result, "final_response") else "¡Hola! Soy el asistente de empresa con Agentes IA. ¿En qué puedo ayudarte hoy?"
+                agent_responses = result.agent_responses if hasattr(result, "agent_responses") else {}
+                context = result.context if hasattr(result, "context") else []
+                
+                return {
+                    "final_response": final_response,
+                    "agent_responses": agent_responses,
+                    "context": context
+                }
         except Exception as e:
-            logger.error(f"Error extracting data from graph result: {str(e)}")
+            logger.error(f"Error processing query: {str(e)}")
             import traceback
             logger.error(traceback.format_exc())
-        
-        # Return a dictionary with the extracted data
-        return {
-            "final_response": final_response,
-            "agent_responses": agent_responses,
-            "context": context_docs
-        } 
+            
+            # Return a friendly default response in case of error
+            return {
+                "final_response": f"¡Hola! Soy el asistente de empresa con Agentes IA. Hubo un problema procesando tu consulta: {str(e)}. Por favor intenta con otra pregunta.",
+                "agent_responses": {},
+                "context": []
+            } 

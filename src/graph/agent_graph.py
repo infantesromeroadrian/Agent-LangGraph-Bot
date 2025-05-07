@@ -19,28 +19,58 @@ def create_agent_graph(agent_nodes):
     
     # Add nodes to the graph
     workflow.add_node("retrieve_context", agent_nodes.retrieve_context)
-    workflow.add_node("supervisor", agent_nodes.supervisor_agent)
-    workflow.add_node("researcher", agent_nodes.researcher_agent)
-    workflow.add_node("analyst", agent_nodes.analyst_agent)
-    workflow.add_node("communicator", agent_nodes.communicator_agent)
+    workflow.add_node("solution_architect", agent_nodes.solution_architect_agent)
+    workflow.add_node("technical_research", agent_nodes.technical_research_agent)
+    workflow.add_node("project_management", agent_nodes.project_management_agent)
+    workflow.add_node("code_review", agent_nodes.code_review_agent)
+    workflow.add_node("market_analysis", agent_nodes.market_analysis_agent)
+    workflow.add_node("data_analysis", agent_nodes.data_analysis_agent)
+    workflow.add_node("client_communication", agent_nodes.client_communication_agent)
     
     # Define the workflow edges
     workflow.set_entry_point("retrieve_context")
-    workflow.add_edge("retrieve_context", "supervisor")
-    workflow.add_edge("supervisor", "researcher")
+    workflow.add_edge("retrieve_context", "solution_architect")
+    workflow.add_edge("solution_architect", "technical_research")
     
-    # Conditional edge based on whether to use analyst
+    # Conditional edges based on whether to use specialized agents
     workflow.add_conditional_edges(
-        "researcher",
-        agent_nodes.should_use_analyst,
+        "technical_research",
+        agent_nodes.should_use_code_review,
         {
-            "use_analyst": "analyst",
-            "skip_analyst": "communicator"
+            "use_code_review": "code_review",
+            "skip_code_review": "project_management"
         }
     )
     
-    workflow.add_edge("analyst", "communicator")
-    workflow.add_edge("communicator", END)
+    workflow.add_conditional_edges(
+        "code_review",
+        agent_nodes.should_use_project_management,
+        {
+            "use_project_management": "project_management",
+            "skip_project_management": "market_analysis"
+        }
+    )
+    
+    workflow.add_conditional_edges(
+        "project_management",
+        agent_nodes.should_use_market_analysis,
+        {
+            "use_market_analysis": "market_analysis",
+            "skip_market_analysis": "data_analysis"
+        }
+    )
+    
+    workflow.add_conditional_edges(
+        "market_analysis",
+        agent_nodes.should_use_data_analysis,
+        {
+            "use_data_analysis": "data_analysis",
+            "skip_data_analysis": "client_communication"
+        }
+    )
+    
+    workflow.add_edge("data_analysis", "client_communication")
+    workflow.add_edge("client_communication", END)
     
     # Compile the graph
     return workflow.compile() 

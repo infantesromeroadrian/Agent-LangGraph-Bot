@@ -51,33 +51,59 @@ async def process_query(query_input: QueryInput):
             conversation_history=context_dict
         )
         
+        logger.info("Query processed, preparing response")
+        
+        # Ensure we have a valid result object
+        if not result or not isinstance(result, dict):
+            logger.error(f"Invalid result type: {type(result)}")
+            return {
+                "query": query_input.query,
+                "response": "Lo siento, ocurrió un error al procesar tu consulta. Por favor intenta nuevamente.",
+                "agent_responses": {},
+                "context_documents": []
+            }
+        
         # Format response - result is now a dictionary
         logger.info("Formatting response")
         response = {
             "query": query_input.query,
-            "response": result["final_response"],
+            "response": result.get("final_response", "Lo siento, no pude generar una respuesta."),
             "agent_responses": {},
             "context_documents": []
         }
         
         # Add agent responses
-        for role, agent_response in result["agent_responses"].items():
-            response["agent_responses"][role] = {
-                "content": agent_response.content,
-                "agent_id": agent_response.agent_id,
-                "agent_role": agent_response.agent_role,
-                "sources": agent_response.sources
-            }
+        agent_responses = result.get("agent_responses", {})
+        for role, agent_response in agent_responses.items():
+            if not isinstance(agent_response, dict) and hasattr(agent_response, '__dict__'):
+                # Convert object to dict if needed
+                agent_response_dict = {
+                    "content": getattr(agent_response, "content", ""),
+                    "agent_id": getattr(agent_response, "agent_id", ""),
+                    "agent_role": getattr(agent_response, "agent_role", role),
+                    "sources": getattr(agent_response, "sources", [])
+                }
+                response["agent_responses"][role] = agent_response_dict
+            else:
+                # Already a dict or other structure
+                response["agent_responses"][role] = agent_response
             
         # Add context documents
-        for doc in result["context"]:
-            response["context_documents"].append({
-                "id": doc.id,
-                "title": doc.title,
-                "snippet": doc.content[:200] + "..." if len(doc.content) > 200 else doc.content,
-                "document_type": doc.document_type,
-                "source": doc.source
-            })
+        context = result.get("context", [])
+        for doc in context:
+            if not isinstance(doc, dict) and hasattr(doc, '__dict__'):
+                # Extract attributes if object
+                doc_dict = {
+                    "id": getattr(doc, "id", ""),
+                    "title": getattr(doc, "title", "Unknown Document"),
+                    "snippet": getattr(doc, "content", "")[:200] + "..." if len(getattr(doc, "content", "")) > 200 else getattr(doc, "content", ""),
+                    "document_type": getattr(doc, "document_type", "unknown"),
+                    "source": getattr(doc, "source", "")
+                }
+                response["context_documents"].append(doc_dict)
+            else:
+                # Already a dict or other structure
+                response["context_documents"].append(doc)
             
         logger.info("Query processed successfully")
         return response
@@ -85,7 +111,15 @@ async def process_query(query_input: QueryInput):
     except Exception as e:
         logger.error(f"Error processing query: {str(e)}")
         logger.error(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=f"Error processing query: {str(e)}")
+        
+        # Return a friendly error response instead of raising an exception
+        return {
+            "query": query_input.query,
+            "response": f"Lo siento, ocurrió un error al procesar tu consulta: {str(e)}. Por favor intenta nuevamente.",
+            "agent_responses": {},
+            "context_documents": [],
+            "error": str(e)  # Include error for frontend debugging
+        }
 
 
 @router.post("/documents/search")
