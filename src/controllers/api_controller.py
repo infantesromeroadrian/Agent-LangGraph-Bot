@@ -2,7 +2,10 @@
 from typing import List, Dict, Any, Optional
 import logging
 import traceback
-from fastapi import APIRouter, HTTPException, Depends, Body
+import io
+import os
+import tempfile
+from fastapi import APIRouter, HTTPException, Depends, Body, UploadFile, File, Form, Request
 
 from src.models.class_models import QueryInput, MessageType
 from src.agents.agent_nodes import AgentNodes
@@ -203,4 +206,120 @@ async def delete_document(document_id: str):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error deleting document: {str(e)}") 
+        raise HTTPException(status_code=500, detail=f"Error deleting document: {str(e)}")
+
+
+@router.post("/documents/upload-file")
+async def upload_file(
+    file: UploadFile = File(...),
+    title: str = Form(...),
+    document_type: str = Form(...),
+    source: str = Form("user_upload")
+):
+    """Upload and process a file, extracting its content before adding it to the vector store.
+    
+    Args:
+        file: The uploaded file (PDF, CSV, etc.)
+        title: Document title
+        document_type: Type of document
+        source: Source of the document
+        
+    Returns:
+        Result of the operation
+    """
+    try:
+        logger.info(f"Processing file upload: {file.filename}, type: {file.content_type}")
+        
+        # Leer el contenido del archivo
+        file_content = await file.read()
+        
+        # Extraer el contenido según el tipo de archivo
+        content = ""
+        
+        if file.content_type == "application/pdf" or file.filename.lower().endswith(".pdf"):
+            # Procesar PDF - requeriría PyPDF2 o similar
+            content = extract_pdf_content(file_content)
+            
+        elif file.content_type == "text/csv" or file.filename.lower().endswith(".csv"):
+            # Procesar CSV como texto simple por ahora
+            content = file_content.decode("utf-8")
+            
+        elif file.content_type in ["text/plain", "text/markdown"] or file.filename.lower().endswith((".txt", ".md")):
+            # Procesar archivos de texto
+            content = file_content.decode("utf-8")
+            
+        else:
+            raise HTTPException(status_code=400, detail="Tipo de archivo no soportado")
+        
+        # Preparar el documento para añadirlo al vector store
+        document_data = {
+            "title": title,
+            "content": content,
+            "document_type": document_type,
+            "source": source,
+            "metadata": {
+                "original_filename": file.filename,
+                "content_type": file.content_type,
+                "upload_method": "file"
+            }
+        }
+        
+        # Añadir el documento al vector store
+        result = document_tool.add_document(document_data)
+        
+        if result.status == "error":
+            raise HTTPException(status_code=400, detail=result.error_message)
+            
+        return {
+            "status": "success",
+            "document": result.result,
+            "metadata": result.metadata
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error processing file: {str(e)}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
+
+
+def extract_pdf_content(pdf_binary):
+    """Extract text content from a PDF file.
+    
+    Args:
+        pdf_binary: Binary content of the PDF file
+        
+    Returns:
+        Extracted text from the PDF
+    """
+    try:
+        # Necesario instalar PyPDF2: pip install PyPDF2
+        try:
+            from PyPDF2 import PdfReader
+        except ImportError:
+            return "Error: PyPDF2 no está instalado. Por favor, instala PyPDF2 para procesar archivos PDF."
+            
+        # Crear un archivo temporal para el PDF
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
+            temp_file.write(pdf_binary)
+            temp_path = temp_file.name
+        
+        try:
+            # Extraer texto del PDF
+            reader = PdfReader(temp_path)
+            text = ""
+            for page in reader.pages:
+                text += page.extract_text() + "\n"
+            
+            # Limpiar un poco el texto extraído
+            text = text.strip()
+            return text
+        finally:
+            # Eliminar el archivo temporal
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+    
+    except Exception as e:
+        logger.error(f"Error extracting PDF content: {str(e)}")
+        return f"Error extracting content: {str(e)}" 

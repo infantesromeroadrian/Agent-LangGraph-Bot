@@ -140,6 +140,31 @@ function initApp() {
         }
     });
     
+    // Event listeners para la carga de documentos
+    const fileTab = document.getElementById('file-tab');
+    const textTab = document.getElementById('text-tab');
+    if (fileTab && textTab) {
+        fileTab.addEventListener('click', () => {
+            document.getElementById('file-content').classList.add('show', 'active');
+            document.getElementById('text-content').classList.remove('show', 'active');
+            fileTab.classList.add('active');
+            textTab.classList.remove('active');
+        });
+        
+        textTab.addEventListener('click', () => {
+            document.getElementById('text-content').classList.add('show', 'active');
+            document.getElementById('file-content').classList.remove('show', 'active');
+            textTab.classList.add('active');
+            fileTab.classList.remove('active');
+        });
+    }
+    
+    // Inicializar evento para vista previa del documento
+    const docFileInput = document.getElementById('docFile');
+    if (docFileInput) {
+        docFileInput.addEventListener('change', handleFileSelection);
+    }
+    
     // Nuevos event listeners para el panel lateral
     elements.agentToggle.addEventListener('click', toggleAgentSidebar);
     elements.closeSidebarBtn.addEventListener('click', toggleAgentSidebar);
@@ -160,6 +185,11 @@ function initApp() {
             elements.sidebar.classList.remove('show');
         }
     });
+    
+    // Inicializar el diagrama de flujo de trabajo
+    if (window.workflowDiagram && typeof window.workflowDiagram.init === 'function') {
+        window.workflowDiagram.init();
+    }
 }
 
 /**
@@ -177,6 +207,11 @@ function toggleDarkMode() {
     }
     
     localStorage.setItem('darkMode', appState.darkMode);
+    
+    // Actualizar el tema del diagrama
+    if (window.workflowDiagram && typeof window.workflowDiagram.updateTheme === 'function') {
+        window.workflowDiagram.updateTheme();
+    }
 }
 
 /**
@@ -969,6 +1004,11 @@ function updateAgentResponses(agentResponses) {
     if (elements.agentToggle) {
         elements.agentToggle.classList.remove('d-none');
     }
+    
+    // Actualizar el diagrama de flujo de trabajo
+    if (window.workflowDiagram && typeof window.workflowDiagram.update === 'function') {
+        window.workflowDiagram.update();
+    }
 }
 
 /**
@@ -981,10 +1021,14 @@ function updateContextDocuments(documents) {
     documents.forEach(doc => {
         const docElement = document.createElement('div');
         docElement.className = 'doc-card';
+        
+        // Asegurarse de que snippet existe antes de usarlo
+        const snippet = doc.snippet || 'Vista previa no disponible';
+        
         docElement.innerHTML = `
             <div class="doc-card-title">${doc.title}</div>
             <div class="doc-card-type">${getDocumentTypeLabel(doc.document_type)}</div>
-            <div class="doc-card-content">${doc.snippet}</div>
+            <div class="doc-card-content">${snippet}</div>
         `;
         
         docElement.addEventListener('click', () => viewDocument(doc.id));
@@ -1059,10 +1103,15 @@ function updateDocumentsList() {
         const docElement = document.createElement('div');
         docElement.className = 'doc-card';
         
+        // Asegurarse de que content exista antes de usar substring
+        const contentPreview = doc.content 
+            ? doc.content.substring(0, 150) + (doc.content.length > 150 ? '...' : '')
+            : 'Vista previa no disponible';
+        
         docElement.innerHTML = `
             <div class="doc-card-title">${doc.title}</div>
             <div class="doc-card-type">${getDocumentTypeLabel(doc.document_type)}</div>
-            <div class="doc-card-content">${doc.content.substring(0, 150)}${doc.content.length > 150 ? '...' : ''}</div>
+            <div class="doc-card-content">${contentPreview}</div>
         `;
         
         docElement.addEventListener('click', () => {
@@ -1120,52 +1169,267 @@ async function handleDocumentSearch() {
  */
 async function handleDocumentUpload() {
     try {
-        const title = document.getElementById('docTitle').value.trim();
-        const type = document.getElementById('docType').value;
-        const content = document.getElementById('docContent').value.trim();
-        const source = document.getElementById('docSource').value.trim();
+        // Determinar qué pestaña está activa
+        const isFileTab = document.querySelector('#file-tab').classList.contains('active');
         
-        if (!title || !content) {
-            alert('Por favor completa los campos requeridos');
-            return;
+        // Obtener los datos según la pestaña activa
+        let title, type, content, fileData = null;
+        let fileInput = null; // Declaración de fileInput aquí para que esté disponible en todo el ámbito
+        let isFileUpload = false; // Flag para indicar si es una carga de archivo binario
+        
+        if (isFileTab) {
+            // Modo de carga de archivo
+            title = document.getElementById('fileDocTitle').value.trim();
+            type = document.getElementById('fileDocType').value;
+            fileInput = document.getElementById('docFile');
+            
+            if (!title || !type) {
+                alert('Por favor completa los campos requeridos');
+                return;
+            }
+            
+            if (!fileInput.files || fileInput.files.length === 0) {
+                alert('Por favor selecciona un archivo');
+                return;
+            }
+            
+            const file = fileInput.files[0];
+            
+            // Verificar tipo de archivo
+            const validTextTypes = ['text/plain', 'text/markdown', 'text/csv'];
+            const validBinaryTypes = ['application/pdf'];
+            const validExtensions = ['.md', '.txt', '.pdf', '.csv'];
+            
+            const isValidType = validTextTypes.includes(file.type) || 
+                               validBinaryTypes.includes(file.type) || 
+                               validExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
+            
+            if (!isValidType) {
+                alert('Por favor sube un archivo PDF, TXT, CSV o Markdown');
+                return;
+            }
+            
+            // Mostrar barra de progreso
+            const progressBar = document.getElementById('uploadProgress');
+            const progressBarInner = progressBar.querySelector('.progress-bar');
+            progressBar.classList.remove('d-none');
+            
+            try {
+                // Determinar si es un archivo de texto o binario
+                if (file.type === 'text/plain' || file.name.endsWith('.txt') || 
+                    file.type === 'text/markdown' || file.name.endsWith('.md') || 
+                    file.type === 'text/csv' || file.name.endsWith('.csv')) {
+                    
+                    // Para archivos de texto plano (incluye CSV)
+                    content = await readTextFile(file, (progress) => {
+                        updateProgressBar(progressBarInner, progress);
+                    });
+                    
+                } else if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
+                    // Para archivos PDF, necesitamos enviar el archivo real
+                    fileData = file;
+                    isFileUpload = true;
+                    
+                    // Simular progreso para feedback visual
+                    for (let i = 0; i <= 100; i += 10) {
+                        setTimeout(() => {
+                            updateProgressBar(progressBarInner, i);
+                        }, i * 20);
+                    }
+                }
+                
+                // Actualizar progreso al 100%
+                updateProgressBar(progressBarInner, 100);
+                
+            } catch (readError) {
+                console.error('Error leyendo archivo:', readError);
+                progressBar.classList.add('d-none');
+                alert(`Error al leer el archivo: ${readError.message}`);
+                return;
+            }
+            
+        } else {
+            // Modo de ingreso de texto
+            title = document.getElementById('textDocTitle').value.trim();
+            type = document.getElementById('textDocType').value;
+            content = document.getElementById('textDocContent').value.trim();
+            
+            if (!title || !type || !content) {
+                alert('Por favor completa los campos requeridos');
+                return;
+            }
         }
         
-        const docData = {
-            title: title,
-            document_type: type,
-            content: content,
-            source: source || 'user_upload'
-        };
-        
-        const response = await fetch('/api/documents', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(docData)
-        });
-        
-        if (!response.ok) {
-            throw new Error('Error al subir documento');
+        if (isFileUpload && fileData) {
+            // Si es un archivo binario (PDF), usamos FormData y un endpoint distinto
+            const formData = new FormData();
+            formData.append('file', fileData);
+            formData.append('title', title);
+            formData.append('document_type', type);
+            formData.append('source', 'user_upload');
+            
+            // Realizamos la petición a un endpoint específico para archivos
+            const response = await fetch('/api/documents/upload-file', {
+                method: 'POST',
+                body: formData
+            });
+            
+            if (!response.ok) {
+                throw new Error(`Error en el servidor: ${response.status} ${response.statusText}`);
+            }
+            
+            const data = await response.json();
+            handleDocumentUploadSuccess(title);
+            
+        } else {
+            // Para documentos de texto, usamos el endpoint JSON estándar
+            const docData = {
+                title: title,
+                document_type: type,
+                content: content,
+                source: 'user_upload',
+                metadata: {
+                    upload_method: isFileTab ? 'file' : 'text',
+                    original_filename: isFileTab && fileInput && fileInput.files.length > 0 ? fileInput.files[0].name : null
+                }
+            };
+            
+            // Realizar la petición al servidor
+            const response = await fetch('/api/documents', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(docData)
+            });
+            
+            if (!response.ok) {
+                throw new Error(`Error en el servidor: ${response.status} ${response.statusText}`);
+            }
+            
+            const data = await response.json();
+            handleDocumentUploadSuccess(title);
         }
-        
-        // Cerrar modal y limpiar campos
-        modals.uploadDoc.hide();
-        document.getElementById('docTitle').value = '';
-        document.getElementById('docType').value = 'policy';
-        document.getElementById('docContent').value = '';
-        document.getElementById('docSource').value = '';
-        
-        // Mostrar mensaje de éxito
-        addSystemMessage('Documento subido correctamente');
-        
-        // Actualizar lista de documentos
-        await loadDocuments();
         
     } catch (error) {
         console.error('Error:', error);
         alert(`Error al subir documento: ${error.message}`);
+        
+        // Ocultar barra de progreso si estaba visible
+        const progressBar = document.getElementById('uploadProgress');
+        if (progressBar && !progressBar.classList.contains('d-none')) {
+            progressBar.classList.add('d-none');
+        }
     }
+}
+
+/**
+ * Maneja el éxito en la carga de un documento
+ * @param {string} title - Título del documento
+ */
+function handleDocumentUploadSuccess(title) {
+    // Ocultar barra de progreso
+    const progressBar = document.getElementById('uploadProgress');
+    if (progressBar && !progressBar.classList.contains('d-none')) {
+        progressBar.classList.add('d-none');
+    }
+    
+    // Cerrar modal y limpiar campos
+    modals.uploadDoc.hide();
+    resetDocumentForms();
+    
+    // Mostrar mensaje de éxito
+    addSystemMessage(`Documento "${title}" subido correctamente`);
+    
+    // Actualizar lista de documentos
+    loadDocuments();
+}
+
+/**
+ * Lee un archivo de texto
+ * @param {File} file - Archivo a leer
+ * @param {Function} progressCallback - Función para actualizar progreso
+ * @returns {Promise<string>} Contenido del archivo
+ */
+function readTextFile(file, progressCallback) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        
+        reader.onprogress = (event) => {
+            if (event.lengthComputable) {
+                const progress = Math.round((event.loaded / event.total) * 100);
+                progressCallback(progress);
+            }
+        };
+        
+        reader.onload = (event) => {
+            resolve(event.target.result);
+        };
+        
+        reader.onerror = (error) => {
+            reject(error);
+        };
+        
+        reader.readAsText(file);
+    });
+}
+
+/**
+ * Lee un archivo binario
+ * @param {File} file - Archivo a leer
+ * @param {Function} progressCallback - Función para actualizar progreso
+ * @returns {Promise<ArrayBuffer>} Contenido binario del archivo
+ */
+function readBinaryFile(file, progressCallback) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        
+        reader.onprogress = (event) => {
+            if (event.lengthComputable) {
+                const progress = Math.round((event.loaded / event.total) * 100);
+                progressCallback(progress);
+            }
+        };
+        
+        reader.onload = (event) => {
+            resolve(file); // Devolvemos el archivo original para FormData
+        };
+        
+        reader.onerror = (error) => {
+            reject(error);
+        };
+        
+        // Solo iniciamos la lectura para seguir el progreso, pero devolvemos el archivo original
+        reader.readAsArrayBuffer(file);
+    });
+}
+
+/**
+ * Actualiza el porcentaje de la barra de progreso
+ * @param {HTMLElement} progressBarElement - Elemento de la barra de progreso
+ * @param {number} percentage - Porcentaje de progreso
+ */
+function updateProgressBar(progressBarElement, percentage) {
+    progressBarElement.style.width = `${percentage}%`;
+    progressBarElement.setAttribute('aria-valuenow', percentage);
+}
+
+/**
+ * Reinicia los formularios de documento
+ */
+function resetDocumentForms() {
+    // Reiniciar formulario de archivo
+    document.getElementById('fileDocTitle').value = '';
+    document.getElementById('fileDocType').value = '';
+    document.getElementById('docFile').value = '';
+    
+    // Reiniciar formulario de texto
+    document.getElementById('textDocTitle').value = '';
+    document.getElementById('textDocType').value = '';
+    document.getElementById('textDocContent').value = '';
+    
+    // Ocultar barra de progreso
+    document.getElementById('uploadProgress').classList.add('d-none');
 }
 
 /**
@@ -1175,9 +1439,9 @@ async function handleDocumentUpload() {
 async function viewDocument(documentId) {
     try {
         // Buscar el documento en el estado o cargarlo del servidor
-        let document = appState.documents.find(doc => doc.id === documentId);
+        let docData = appState.documents.find(doc => doc.id === documentId);
         
-        if (!document) {
+        if (!docData) {
             const response = await fetch('/api/documents/search', {
                 method: 'POST',
                 headers: {
@@ -1193,21 +1457,32 @@ async function viewDocument(documentId) {
             }
             
             const data = await response.json();
-            document = data.results && data.results.length > 0 ? data.results[0] : null;
+            docData = data.results && data.results.length > 0 ? data.results[0] : null;
         }
         
-        if (!document) {
+        if (!docData) {
             throw new Error('Documento no encontrado');
         }
         
         // Configurar modal de visualización
-        document.getElementById('viewDocTitle').textContent = document.title;
-        document.getElementById('viewDocType').textContent = getDocumentTypeLabel(document.document_type);
-        document.getElementById('viewDocSource').textContent = `Fuente: ${document.source || 'Desconocida'}`;
-        document.getElementById('viewDocContent').innerHTML = document.content.replace(/\n/g, '<br>');
+        document.getElementById('viewDocTitle').textContent = docData.title;
+        document.getElementById('viewDocType').textContent = getDocumentTypeLabel(docData.document_type);
+        
+        // Verificar si source existe antes de mostrarlo
+        const sourceElement = document.getElementById('viewDocSource');
+        if (sourceElement) {
+            sourceElement.textContent = `Fuente: ${docData.source || 'Desconocida'}`;
+        }
+        
+        // Verificar si content existe antes de mostrarlo
+        const contentElement = document.getElementById('viewDocContent');
+        if (contentElement) {
+            const content = docData.content || 'No hay contenido disponible para mostrar';
+            contentElement.innerHTML = typeof content === 'string' ? content.replace(/\n/g, '<br>') : 'Contenido no disponible';
+        }
         
         // Configurar botón de eliminar
-        elements.deleteDocBtn.dataset.documentId = document.id;
+        elements.deleteDocBtn.dataset.documentId = docData.id;
         
         // Mostrar modal
         modals.viewDoc.show();
@@ -1245,6 +1520,50 @@ async function deleteDocument(documentId) {
         console.error('Error:', error);
         alert(`Error al eliminar documento: ${error.message}`);
     }
+}
+
+/**
+ * Maneja la selección de archivos
+ * @param {Event} event - Evento de cambio
+ */
+function handleFileSelection(event) {
+    const fileInput = event.target;
+    const fileNameDisplay = document.createElement('div');
+    fileNameDisplay.className = 'selected-file-info mt-2';
+    
+    // Eliminar información anterior si existe
+    const previousInfo = fileInput.parentElement.querySelector('.selected-file-info');
+    if (previousInfo) {
+        previousInfo.remove();
+    }
+    
+    if (fileInput.files && fileInput.files.length > 0) {
+        const file = fileInput.files[0];
+        const fileSize = formatFileSize(file.size);
+        
+        fileNameDisplay.innerHTML = `
+            <div class="d-flex align-items-center">
+                <i class="bi bi-file-earmark-text me-2"></i>
+                <div>
+                    <div class="selected-filename">${file.name}</div>
+                    <div class="selected-filesize">${fileSize}</div>
+                </div>
+            </div>
+        `;
+        
+        fileInput.parentElement.appendChild(fileNameDisplay);
+    }
+}
+
+/**
+ * Formatea el tamaño del archivo a una representación legible
+ * @param {number} bytes - Tamaño en bytes
+ * @returns {string} Tamaño formateado
+ */
+function formatFileSize(bytes) {
+    if (bytes < 1024) return bytes + ' bytes';
+    else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+    else return (bytes / 1048576).toFixed(1) + ' MB';
 }
 
 // Inicializar la aplicación al cargar la página

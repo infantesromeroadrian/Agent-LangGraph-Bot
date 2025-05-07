@@ -140,6 +140,7 @@ body {
 .chat-header {
     padding: 1rem 1.5rem;
     background-color: rgba(248, 249, 250, 0.8);
+    -webkit-backdrop-filter: blur(10px);
     backdrop-filter: blur(10px);
     border-bottom: 1px solid var(--border-color);
     display: flex;
@@ -362,21 +363,38 @@ body {
 
 /* Agent workflow */
 .workflow-container {
-    padding: 1.2rem;
-    background-color: white;
+    padding: 0.8rem;
+    background-color: rgba(0, 0, 0, 0.15);
     border-radius: 0.8rem;
-    box-shadow: var(--shadow-md);
-    margin: 1rem 0;
+    margin: 0.5rem 0;
 }
 
 [data-theme="dark"] .workflow-container {
-    background-color: var(--dark-secondary);
+    background-color: rgba(0, 0, 0, 0.25);
 }
 
 .workflow-visualization {
-    max-height: 400px;
+    max-height: 300px;
     overflow-y: auto;
     text-align: center;
+    margin: 10px 0;
+}
+
+/* Ajuste para el sidebar */
+.sidebar .workflow-container {
+    padding: 0.6rem;
+    margin-bottom: 1rem;
+}
+
+.sidebar .workflow-container h5 {
+    font-size: 0.9rem;
+    margin-bottom: 0.5rem;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.sidebar .mermaid-diagram {
+    min-height: 200px;
+    font-size: 90%;
 }
 
 /* Agent details panel */
@@ -751,4 +769,124 @@ body {
     .agent-sidebar.show {
         transform: translateX(0);
     }
+}
+
+/* Estilos para el diagrama mermaid */
+.mermaid-diagram {
+    background-color: var(--bg-color-secondary);
+    border-radius: 8px;
+    padding: 16px;
+    margin: 0 auto;
+    max-width: 100%;
+    overflow: auto;
+    min-height: 300px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* Estilos específicos para nodos y aristas del diagrama */
+.mermaid-diagram .node rect, 
+.mermaid-diagram .node circle, 
+.mermaid-diagram .node ellipse, 
+.mermaid-diagram .node polygon, 
+.mermaid-diagram .node path {
+    stroke-width: 2px;
+    transition: all 0.3s ease;
+}
+
+/* Estilos para aristas */
+.mermaid-diagram .edgePath path {
+    stroke-width: 2px;
+    transition: stroke 0.3s ease;
+}
+
+/* Estilos de texto */
+.mermaid-diagram .label {
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+}
+
+[data-theme="dark"] .mermaid-diagram .arrowheadPath {
+    fill: #ddd;
+    stroke: none;
+}
+
+[data-theme="dark"] .mermaid-diagram .edgePath .path {
+    stroke: #ddd;
+}
+
+[data-theme="light"] .mermaid-diagram .arrowheadPath {
+    fill: #555;
+    stroke: none;
+}
+
+[data-theme="light"] .mermaid-diagram .edgePath .path {
+    stroke: #555;
+}
+
+/* Estilos para carga de documentos */
+.selected-file-info {
+    background-color: rgba(0, 0, 0, 0.05);
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 0.85rem;
+}
+
+[data-theme="dark"] .selected-file-info {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.selected-filename {
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 250px;
+}
+
+.selected-filesize {
+    color: var(--secondary-color);
+    font-size: 0.75rem;
+}
+
+/* Estilo para tab panels */
+.tab-content {
+    padding-top: 15px;
+}
+
+.nav-tabs .nav-link {
+    color: var(--secondary-color);
+}
+
+.nav-tabs .nav-link.active {
+    color: var(--primary-color);
+    font-weight: 500;
+}
+
+[data-theme="dark"] .nav-tabs .nav-link {
+    color: rgba(255, 255, 255, 0.7);
+}
+
+[data-theme="dark"] .nav-tabs .nav-link.active {
+    color: white;
+    background-color: var(--dark-secondary);
+    border-color: transparent transparent var(--primary-color);
+}
+
+[data-theme="dark"] .nav-tabs {
+    border-bottom-color: var(--border-color);
+}
+
+/* Barra de progreso */
+.progress {
+    height: 8px;
+    border-radius: 4px;
+    background-color: rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="dark"] .progress {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.progress-bar {
+    background-color: var(--primary-color);
 } 
