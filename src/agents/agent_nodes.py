@@ -31,6 +31,20 @@ class AgentNodes:
         """
         if not state.human_query:
             return state
+        
+        # Check if this is a simple greeting or conversational query
+        simple_query = self._is_simple_conversational_query(state.human_query)
+        
+        if simple_query:
+            # For simple queries like greetings, don't retrieve documents
+            # Just add a system message
+            system_msg = create_message(
+                f"Handling conversational query without document retrieval.",
+                MessageType.SYSTEM,
+                "system"
+            )
+            state.messages.append(system_msg)
+            return state
             
         # Retrieve relevant documents
         documents = self.vector_store.search(state.human_query)
@@ -48,6 +62,45 @@ class AgentNodes:
             state.messages.append(system_msg)
             
         return state
+        
+    def _is_simple_conversational_query(self, query: str) -> bool:
+        """Detect if a query is a simple greeting or conversational message.
+        
+        Args:
+            query: User query
+            
+        Returns:
+            Boolean indicating if this is a simple conversational query
+        """
+        # Convert to lowercase for case-insensitive matching
+        query_lower = query.lower().strip()
+        
+        # Common greetings and simple queries in multiple languages
+        greetings = [
+            "hello", "hi", "hey", "howdy", "greetings", "good morning", "good afternoon", 
+            "good evening", "hola", "buenos días", "buenas tardes", "buenas noches",
+            "how are you", "how's it going", "what's up", "cómo estás", "qué tal",
+            "thank you", "thanks", "gracias", "goodbye", "bye", "adiós", "chao"
+        ]
+        
+        # Check for exact match or if query starts with any greeting
+        for greeting in greetings:
+            if query_lower == greeting or query_lower.startswith(greeting + " "):
+                return True
+        
+        # More selective check for very short queries
+        # Only treat single-word or very simple phrases as conversational
+        words = query_lower.split()
+        if len(words) <= 2:
+            # But check if it contains any question-related keywords that indicate a real query
+            question_indicators = ["what", "how", "why", "when", "where", "who", "which", 
+                                   "qué", "cómo", "por qué", "cuándo", "dónde", "quién", "cuál"]
+            
+            # If it contains any question indicator, it might be a real query despite being short
+            if not any(indicator in query_lower for indicator in question_indicators):
+                return True
+                
+        return False
         
     def solution_architect_agent(self, state: GraphState) -> GraphState:
         """Solution Architect agent to evaluate technical requirements and design solutions.
@@ -485,6 +538,35 @@ class AgentNodes:
         # Set current agent
         state.current_agent = AgentRole.CLIENT_COMMUNICATION
         
+        # Check if this is a simple conversational query
+        if not state.context and self._is_simple_conversational_query(state.human_query):
+            # Generate a simple conversational response directly
+            simple_response = self._generate_conversational_response(state.human_query, state.messages)
+            
+            # Create agent response
+            agent_response = create_agent_response(
+                content=simple_response,
+                agent_role=AgentRole.CLIENT_COMMUNICATION,
+                sources=[],  # No sources for conversational responses
+            )
+            
+            # Set final response in state
+            state.final_response = simple_response
+            
+            # Add AI message to conversation history
+            ai_msg = create_message(
+                simple_response,
+                MessageType.AI,
+                "company_bot"
+            )
+            state.messages.append(ai_msg)
+            
+            # Update state
+            state.agent_responses[AgentRole.CLIENT_COMMUNICATION] = agent_response
+            
+            return state
+        
+        # For regular queries, continue with normal processing
         # Prepare context from other agent responses for comprehensive communication
         from src.models.class_models import CompanyDocument
         context = state.context.copy()
@@ -537,6 +619,38 @@ class AgentNodes:
         state.agent_responses[AgentRole.CLIENT_COMMUNICATION] = agent_response
         
         return state
+        
+    def _generate_conversational_response(self, query: str, conversation_history: List[Any]) -> str:
+        """Generate a simple conversational response.
+        
+        Args:
+            query: User query
+            conversation_history: Conversation history
+            
+        Returns:
+            Simple conversational response
+        """
+        # Simple templates for different types of conversational queries
+        query_lower = query.lower().strip()
+        
+        # Process greetings
+        if any(greeting in query_lower for greeting in ["hello", "hi", "hey", "hola", "buenos", "buenas"]):
+            return "¡Hola! Soy el asistente de consultoría tecnológica AI. ¿En qué puedo ayudarte hoy?"
+            
+        # Process how are you
+        if any(phrase in query_lower for phrase in ["how are you", "cómo estás", "qué tal", "como estas", "que tal"]):
+            return "¡Estoy muy bien, gracias por preguntar! ¿En qué proyecto tecnológico puedo ayudarte hoy?"
+            
+        # Process thanks
+        if any(phrase in query_lower for phrase in ["thank", "thanks", "gracias"]):
+            return "¡De nada! Estoy aquí para ayudarte con tus consultas y proyectos tecnológicos. ¿Hay algo más en lo que pueda asistirte?"
+            
+        # Process goodbye
+        if any(phrase in query_lower for phrase in ["bye", "goodbye", "adiós", "adios", "chao"]):
+            return "¡Hasta luego! No dudes en volver si necesitas más ayuda con tus proyectos tecnológicos."
+            
+        # Default response for other short queries
+        return "Estoy aquí para ayudarte con consultas técnicas y proyectos tecnológicos. ¿Tienes alguna pregunta específica o necesitas información sobre algún tema en particular?"
     
     def should_use_code_review(self, state: GraphState) -> str:
         """Determine if the Code Review agent should be used.
@@ -635,9 +749,6 @@ class AgentNodes:
         
         logger = logging.getLogger(__name__)
         
-        # Create agent graph
-        graph = create_agent_graph(self)
-        
         # Initialize messages from conversation history
         messages = []
         if conversation_history:
@@ -648,6 +759,35 @@ class AgentNodes:
                     message_type,
                     msg.get("sender")
                 ))
+        
+        # Fast path for simple conversational queries
+        if self._is_simple_conversational_query(query):
+            logger.info(f"Detected simple conversational query: '{query}'. Using fast path response.")
+            
+            # Generate simple response
+            simple_response = self._generate_conversational_response(query, messages)
+            
+            # Create a simple agent response
+            agent_response = create_agent_response(
+                content=simple_response,
+                agent_role=AgentRole.CLIENT_COMMUNICATION,
+                sources=[],
+            )
+            
+            # Return minimal result dictionary
+            return {
+                "final_response": simple_response,
+                "agent_responses": {
+                    AgentRole.CLIENT_COMMUNICATION: agent_response
+                },
+                "context": []
+            }
+        
+        # Regular processing for non-conversational queries
+        logger.info(f"Processing complex query: '{query}' through full agent workflow")
+        
+        # Create agent graph
+        graph = create_agent_graph(self)
         
         # Create initial state
         state = GraphState(

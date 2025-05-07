@@ -235,18 +235,26 @@ async def upload_file(
         
         # Extraer el contenido según el tipo de archivo
         content = ""
+        metadata = {
+            "original_filename": file.filename,
+            "content_type": file.content_type,
+            "upload_method": "file"
+        }
         
         if file.content_type == "application/pdf" or file.filename.lower().endswith(".pdf"):
-            # Procesar PDF - requeriría PyPDF2 o similar
+            # Procesar PDF usando PyPDF2
             content = extract_pdf_content(file_content)
+            metadata["file_type"] = "pdf"
             
         elif file.content_type == "text/csv" or file.filename.lower().endswith(".csv"):
-            # Procesar CSV como texto simple por ahora
-            content = file_content.decode("utf-8")
+            # Procesar CSV como texto con formato
+            content = extract_csv_content(file_content)
+            metadata["file_type"] = "csv"
             
         elif file.content_type in ["text/plain", "text/markdown"] or file.filename.lower().endswith((".txt", ".md")):
             # Procesar archivos de texto
             content = file_content.decode("utf-8")
+            metadata["file_type"] = "text"
             
         else:
             raise HTTPException(status_code=400, detail="Tipo de archivo no soportado")
@@ -257,11 +265,7 @@ async def upload_file(
             "content": content,
             "document_type": document_type,
             "source": source,
-            "metadata": {
-                "original_filename": file.filename,
-                "content_type": file.content_type,
-                "upload_method": "file"
-            }
+            "metadata": metadata
         }
         
         # Añadir el documento al vector store
@@ -309,11 +313,25 @@ def extract_pdf_content(pdf_binary):
             # Extraer texto del PDF
             reader = PdfReader(temp_path)
             text = ""
-            for page in reader.pages:
-                text += page.extract_text() + "\n"
             
-            # Limpiar un poco el texto extraído
+            # Extraer página por página para preservar estructura
+            for i, page in enumerate(reader.pages):
+                page_text = page.extract_text()
+                if page_text:
+                    # Agregar separador de página para mejor organización
+                    if i > 0:
+                        text += "\n\n--- Página " + str(i+1) + " ---\n\n"
+                    else:
+                        text += "--- Página 1 ---\n\n"
+                    text += page_text.strip() + "\n"
+            
+            # Limpiar texto extraído
             text = text.strip()
+            
+            # Si no se extrajo texto, podría ser un PDF escaneado
+            if not text:
+                text = "Este documento parece ser un PDF escaneado o no contiene texto extraíble."
+                
             return text
         finally:
             # Eliminar el archivo temporal
@@ -322,4 +340,105 @@ def extract_pdf_content(pdf_binary):
     
     except Exception as e:
         logger.error(f"Error extracting PDF content: {str(e)}")
-        return f"Error extracting content: {str(e)}" 
+        return f"Error extracting content: {str(e)}"
+
+
+def extract_csv_content(csv_binary):
+    """Extract and format content from a CSV file.
+    
+    Args:
+        csv_binary: Binary content of the CSV file
+        
+    Returns:
+        Formatted text representation of the CSV content
+    """
+    try:
+        import csv
+        from io import StringIO
+        
+        # Decodificar el contenido binario a texto
+        # Intentar con utf-8 primero, pero probar otras codificaciones si falla
+        try:
+            csv_text = csv_binary.decode('utf-8')
+        except UnicodeDecodeError:
+            try:
+                csv_text = csv_binary.decode('latin-1')
+            except:
+                csv_text = csv_binary.decode('cp1252', errors='replace')
+        
+        # Usar StringIO para leer el texto como archivo
+        csv_file = StringIO(csv_text)
+        
+        # Leer CSV con el módulo csv
+        reader = csv.reader(csv_file)
+        rows = list(reader)
+        
+        if not rows:
+            return "CSV vacío o sin datos"
+        
+        # Obtener encabezados (primera fila)
+        headers = rows[0]
+        
+        # Formatear como texto estructurado
+        result = "--- DATOS CSV ---\n\n"
+        
+        # Agregar descripción de estructura
+        result += f"Columnas ({len(headers)}): {', '.join(headers)}\n"
+        result += f"Filas: {len(rows) - 1}\n\n"
+        
+        # Limitar la cantidad de filas para prevenir documentos demasiado grandes
+        max_rows = min(100, len(rows))
+        
+        # Crear una tabla de texto simple
+        column_widths = [max(len(str(row[i])) if i < len(row) else 0 for row in rows[:max_rows]) 
+                         for i in range(len(headers))]
+        column_widths = [max(w, len(h)) for w, h in zip(column_widths, headers)]
+        
+        # Agregar encabezados
+        header_row = " | ".join(h.ljust(w) for h, w in zip(headers, column_widths))
+        result += header_row + "\n"
+        result += "-" * len(header_row) + "\n"
+        
+        # Agregar filas de datos (limitadas)
+        for i, row in enumerate(rows[1:max_rows], 1):
+            # Asegurar que cada fila tenga la misma cantidad de columnas que los encabezados
+            row_padded = row + [''] * (len(headers) - len(row))
+            result += " | ".join(str(cell).ljust(w) for cell, w in zip(row_padded[:len(headers)], column_widths)) + "\n"
+        
+        # Indicar si hay más filas
+        if len(rows) > max_rows:
+            result += f"\n... y {len(rows) - max_rows} filas más (truncado) ..."
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error extracting CSV content: {str(e)}")
+        # Fallback: devolver el CSV como texto plano
+        try:
+            return csv_binary.decode('utf-8', errors='replace')
+        except:
+            return f"Error processing CSV: {str(e)}"
+
+
+@router.delete("/documents")
+async def clear_all_documents():
+    """Delete all documents from the vector store.
+    
+    Returns:
+        Result of the operation
+    """
+    try:
+        success = vector_store.clear_all_documents()
+        
+        if not success:
+            raise HTTPException(status_code=500, detail="Error clearing documents")
+            
+        return {
+            "status": "success",
+            "message": "All documents have been cleared"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error clearing documents: {str(e)}") 

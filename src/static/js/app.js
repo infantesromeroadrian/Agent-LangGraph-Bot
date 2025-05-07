@@ -43,7 +43,6 @@ const elements = {
     saveDocBtn: document.getElementById('saveDocBtn'),
     docSearchBtn: document.getElementById('docSearchBtn'),
     conversationList: document.getElementById('conversationList'),
-    workflowContainer: document.getElementById('workflowContainer'),
     agentDetailsPanel: document.getElementById('agentDetailsPanel'),
     documentContextPanel: document.getElementById('documentContextPanel'),
     contextDocumentsContainer: document.getElementById('contextDocumentsContainer'),
@@ -165,6 +164,38 @@ function initApp() {
         docFileInput.addEventListener('change', handleFileSelection);
     }
     
+    // Botón para limpiar selección de archivo
+    const clearFileBtn = document.getElementById('clearFileBtn');
+    if (clearFileBtn) {
+        clearFileBtn.addEventListener('click', clearFileSelection);
+    }
+    
+    // Botones para borrar todos los documentos
+    const clearAllDocsBtn = document.getElementById('clearAllDocsBtn');
+    const confirmClearDocsBtn = document.getElementById('confirmClearDocsBtn');
+    const cancelClearDocsBtn = document.getElementById('cancelClearDocsBtn');
+    const clearDocsConfirm = document.getElementById('clearDocsConfirm');
+    
+    if (clearAllDocsBtn) {
+        clearAllDocsBtn.addEventListener('click', () => {
+            // Mostrar confirmación
+            clearDocsConfirm.classList.remove('d-none');
+            clearAllDocsBtn.classList.add('d-none');
+        });
+    }
+    
+    if (confirmClearDocsBtn) {
+        confirmClearDocsBtn.addEventListener('click', clearAllDocuments);
+    }
+    
+    if (cancelClearDocsBtn) {
+        cancelClearDocsBtn.addEventListener('click', () => {
+            // Ocultar confirmación
+            clearDocsConfirm.classList.add('d-none');
+            clearAllDocsBtn.classList.remove('d-none');
+        });
+    }
+    
     // Nuevos event listeners para el panel lateral
     elements.agentToggle.addEventListener('click', toggleAgentSidebar);
     elements.closeSidebarBtn.addEventListener('click', toggleAgentSidebar);
@@ -185,11 +216,6 @@ function initApp() {
             elements.sidebar.classList.remove('show');
         }
     });
-    
-    // Inicializar el diagrama de flujo de trabajo
-    if (window.workflowDiagram && typeof window.workflowDiagram.init === 'function') {
-        window.workflowDiagram.init();
-    }
 }
 
 /**
@@ -207,11 +233,6 @@ function toggleDarkMode() {
     }
     
     localStorage.setItem('darkMode', appState.darkMode);
-    
-    // Actualizar el tema del diagrama
-    if (window.workflowDiagram && typeof window.workflowDiagram.updateTheme === 'function') {
-        window.workflowDiagram.updateTheme();
-    }
 }
 
 /**
@@ -518,7 +539,6 @@ function loadConversation(conversationId) {
     addSystemMessage('Conversación cargada. Continúa tu chat con los agentes IA.');
     
     // Ocultar paneles
-    elements.workflowContainer.classList.add('d-none');
     elements.agentDetailsPanel.classList.add('d-none');
     elements.documentContextPanel.classList.add('d-none');
     elements.agentToggle.classList.add('d-none');
@@ -759,9 +779,6 @@ async function processUserMessage(message) {
     try {
         // Mostrar el botón de agentes
         elements.agentToggle.classList.remove('d-none');
-        
-        // Mostrar panel de flujo de trabajo
-        elements.workflowContainer.classList.remove('d-none');
         
         // Iniciar procesamiento en la línea de tiempo
         resetTimelineSteps();
@@ -1004,11 +1021,6 @@ function updateAgentResponses(agentResponses) {
     if (elements.agentToggle) {
         elements.agentToggle.classList.remove('d-none');
     }
-    
-    // Actualizar el diagrama de flujo de trabajo
-    if (window.workflowDiagram && typeof window.workflowDiagram.update === 'function') {
-        window.workflowDiagram.update();
-    }
 }
 
 /**
@@ -1169,27 +1181,29 @@ async function handleDocumentSearch() {
  */
 async function handleDocumentUpload() {
     try {
+        // Ocultar alertas anteriores
+        hideUploadAlerts();
+        
         // Determinar qué pestaña está activa
         const isFileTab = document.querySelector('#file-tab').classList.contains('active');
         
         // Obtener los datos según la pestaña activa
         let title, type, content, fileData = null;
-        let fileInput = null; // Declaración de fileInput aquí para que esté disponible en todo el ámbito
+        let fileInput = document.getElementById('docFile'); // Declarar fileInput en un ámbito más amplio
         let isFileUpload = false; // Flag para indicar si es una carga de archivo binario
         
         if (isFileTab) {
             // Modo de carga de archivo
             title = document.getElementById('fileDocTitle').value.trim();
             type = document.getElementById('fileDocType').value;
-            fileInput = document.getElementById('docFile');
             
             if (!title || !type) {
-                alert('Por favor completa los campos requeridos');
+                showUploadError('Por favor completa los campos requeridos');
                 return;
             }
             
             if (!fileInput.files || fileInput.files.length === 0) {
-                alert('Por favor selecciona un archivo');
+                showUploadError('Por favor selecciona un archivo');
                 return;
             }
             
@@ -1205,7 +1219,7 @@ async function handleDocumentUpload() {
                                validExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
             
             if (!isValidType) {
-                alert('Por favor sube un archivo PDF, TXT, CSV o Markdown');
+                showUploadError('Por favor sube un archivo PDF, TXT, CSV o Markdown');
                 return;
             }
             
@@ -1217,13 +1231,23 @@ async function handleDocumentUpload() {
             try {
                 // Determinar si es un archivo de texto o binario
                 if (file.type === 'text/plain' || file.name.endsWith('.txt') || 
-                    file.type === 'text/markdown' || file.name.endsWith('.md') || 
-                    file.type === 'text/csv' || file.name.endsWith('.csv')) {
+                    file.type === 'text/markdown' || file.name.endsWith('.md')) {
                     
-                    // Para archivos de texto plano (incluye CSV)
+                    // Para archivos de texto plano
                     content = await readTextFile(file, (progress) => {
                         updateProgressBar(progressBarInner, progress);
                     });
+                    
+                } else if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
+                    // Para archivos CSV
+                    content = await readTextFile(file, (progress) => {
+                        updateProgressBar(progressBarInner, progress);
+                    });
+                    
+                    // Si es CSV, ajustar el tipo si no se seleccionó específicamente
+                    if (type === 'other') {
+                        type = 'data';
+                    }
                     
                 } else if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
                     // Para archivos PDF, necesitamos enviar el archivo real
@@ -1232,9 +1256,8 @@ async function handleDocumentUpload() {
                     
                     // Simular progreso para feedback visual
                     for (let i = 0; i <= 100; i += 10) {
-                        setTimeout(() => {
-                            updateProgressBar(progressBarInner, i);
-                        }, i * 20);
+                        await new Promise(r => setTimeout(r, 20));
+                        updateProgressBar(progressBarInner, i);
                     }
                 }
                 
@@ -1244,7 +1267,7 @@ async function handleDocumentUpload() {
             } catch (readError) {
                 console.error('Error leyendo archivo:', readError);
                 progressBar.classList.add('d-none');
-                alert(`Error al leer el archivo: ${readError.message}`);
+                showUploadError(`Error al leer el archivo: ${readError.message}`);
                 return;
             }
             
@@ -1255,7 +1278,7 @@ async function handleDocumentUpload() {
             content = document.getElementById('textDocContent').value.trim();
             
             if (!title || !type || !content) {
-                alert('Por favor completa los campos requeridos');
+                showUploadError('Por favor completa los campos requeridos');
                 return;
             }
         }
@@ -1275,7 +1298,8 @@ async function handleDocumentUpload() {
             });
             
             if (!response.ok) {
-                throw new Error(`Error en el servidor: ${response.status} ${response.statusText}`);
+                const errorData = await response.json();
+                throw new Error(errorData.detail || `Error en el servidor: ${response.status}`);
             }
             
             const data = await response.json();
@@ -1304,7 +1328,8 @@ async function handleDocumentUpload() {
             });
             
             if (!response.ok) {
-                throw new Error(`Error en el servidor: ${response.status} ${response.statusText}`);
+                const errorData = await response.json();
+                throw new Error(errorData.detail || `Error en el servidor: ${response.status}`);
             }
             
             const data = await response.json();
@@ -1313,13 +1338,54 @@ async function handleDocumentUpload() {
         
     } catch (error) {
         console.error('Error:', error);
-        alert(`Error al subir documento: ${error.message}`);
+        showUploadError(`Error al subir documento: ${error.message}`);
         
         // Ocultar barra de progreso si estaba visible
         const progressBar = document.getElementById('uploadProgress');
         if (progressBar && !progressBar.classList.contains('d-none')) {
             progressBar.classList.add('d-none');
         }
+    }
+}
+
+/**
+ * Muestra un mensaje de error en la interfaz de carga
+ * @param {string} message - Mensaje de error
+ */
+function showUploadError(message) {
+    const errorAlert = document.getElementById('uploadError');
+    const errorMessage = document.getElementById('errorMessage');
+    
+    if (errorAlert && errorMessage) {
+        errorMessage.textContent = message;
+        errorAlert.classList.remove('d-none');
+    }
+}
+
+/**
+ * Muestra un mensaje de éxito en la interfaz de carga
+ */
+function showUploadSuccess() {
+    const successAlert = document.getElementById('uploadSuccess');
+    
+    if (successAlert) {
+        successAlert.classList.remove('d-none');
+    }
+}
+
+/**
+ * Oculta todas las alertas de la interfaz de carga
+ */
+function hideUploadAlerts() {
+    const errorAlert = document.getElementById('uploadError');
+    const successAlert = document.getElementById('uploadSuccess');
+    
+    if (errorAlert) {
+        errorAlert.classList.add('d-none');
+    }
+    
+    if (successAlert) {
+        successAlert.classList.add('d-none');
     }
 }
 
@@ -1334,15 +1400,119 @@ function handleDocumentUploadSuccess(title) {
         progressBar.classList.add('d-none');
     }
     
-    // Cerrar modal y limpiar campos
-    modals.uploadDoc.hide();
-    resetDocumentForms();
+    // Mostrar mensaje de éxito en la interfaz
+    showUploadSuccess();
     
-    // Mostrar mensaje de éxito
+    // Mostrar mensaje de éxito en el chat
     addSystemMessage(`Documento "${title}" subido correctamente`);
     
-    // Actualizar lista de documentos
-    loadDocuments();
+    // Esperar un momento antes de cerrar el modal
+    setTimeout(() => {
+        // Cerrar modal y limpiar campos
+        modals.uploadDoc.hide();
+        resetDocumentForms();
+        
+        // Actualizar lista de documentos
+        loadDocuments();
+    }, 1500);
+}
+
+/**
+ * Maneja la selección de archivos
+ * @param {Event} event - Evento de cambio
+ */
+function handleFileSelection(event) {
+    const fileInput = event.target;
+    const filePreviewContainer = document.getElementById('filePreviewContainer');
+    const fileNameDisplay = document.getElementById('fileNameDisplay');
+    const fileSizeDisplay = document.getElementById('fileSizeDisplay');
+    const fileTypeIcon = document.getElementById('fileTypeIcon');
+    
+    // Reiniciar las alertas
+    hideUploadAlerts();
+    
+    if (fileInput.files && fileInput.files.length > 0) {
+        const file = fileInput.files[0];
+        const fileSize = formatFileSize(file.size);
+        
+        // Mostrar contenedor de vista previa
+        filePreviewContainer.classList.remove('d-none');
+        
+        // Actualizar información del archivo
+        fileNameDisplay.textContent = file.name;
+        fileSizeDisplay.textContent = fileSize;
+        
+        // Actualizar ícono según el tipo de archivo
+        fileTypeIcon.className = 'bi me-2 fs-4 ';
+        
+        if (file.name.endsWith('.pdf')) {
+            fileTypeIcon.classList.add('bi-file-earmark-pdf');
+            fileTypeIcon.style.color = '#dc3545'; // Color rojo para PDF
+        } else if (file.name.endsWith('.csv')) {
+            fileTypeIcon.classList.add('bi-file-earmark-spreadsheet');
+            fileTypeIcon.style.color = '#198754'; // Color verde para CSV
+        } else if (file.name.endsWith('.txt')) {
+            fileTypeIcon.classList.add('bi-file-earmark-text');
+            fileTypeIcon.style.color = '#0d6efd'; // Color azul para TXT
+        } else if (file.name.endsWith('.md')) {
+            fileTypeIcon.classList.add('bi-markdown');
+            fileTypeIcon.style.color = '#6610f2'; // Color índigo para MD
+        } else {
+            fileTypeIcon.classList.add('bi-file-earmark');
+            fileTypeIcon.style.color = '#6c757d'; // Color gris por defecto
+        }
+        
+        // Sugerir título basado en nombre de archivo si está vacío
+        const titleInput = document.getElementById('fileDocTitle');
+        if (titleInput && !titleInput.value) {
+            // Extraer nombre sin extensión
+            const fileName = file.name.split('.').slice(0, -1).join('.');
+            titleInput.value = fileName;
+        }
+        
+        // Sugerir tipo de documento basado en la extensión
+        const typeInput = document.getElementById('fileDocType');
+        if (typeInput && typeInput.value === '') {
+            if (file.name.endsWith('.csv')) {
+                typeInput.value = 'data';
+            } else if (file.name.endsWith('.md') || file.name.endsWith('.txt')) {
+                typeInput.value = 'technical';
+            }
+        }
+    } else {
+        // Ocultar contenedor de vista previa si no hay archivo
+        filePreviewContainer.classList.add('d-none');
+    }
+}
+
+/**
+ * Limpia la selección de archivo
+ */
+function clearFileSelection() {
+    const fileInput = document.getElementById('docFile');
+    const filePreviewContainer = document.getElementById('filePreviewContainer');
+    
+    if (fileInput) {
+        fileInput.value = '';
+    }
+    
+    if (filePreviewContainer) {
+        filePreviewContainer.classList.add('d-none');
+    }
+    
+    // Ocultar alertas
+    hideUploadAlerts();
+}
+
+/**
+ * Formatea el tamaño del archivo a una representación legible
+ * @param {number} bytes - Tamaño en bytes
+ * @returns {string} Tamaño formateado
+ */
+function formatFileSize(bytes) {
+    if (bytes < 1024) return bytes + ' bytes';
+    else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+    else return (bytes / 1048576).toFixed(1) + ' MB';
 }
 
 /**
@@ -1500,70 +1670,99 @@ async function viewDocument(documentId) {
 async function deleteDocument(documentId) {
     try {
         const response = await fetch(`/api/documents/${documentId}`, {
-            method: 'DELETE'
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json'
+            }
         });
         
-        if (!response.ok) {
-            throw new Error('Error al eliminar documento');
+        const data = await response.json();
+        
+        if (response.ok) {
+            // Cerrar modales
+            modals.viewDoc.hide();
+            
+            // Recargar lista de documentos
+            loadDocuments();
+            
+            // Mostrar mensaje de éxito
+            addSystemMessage(`Documento eliminado: ${documentId}`);
+        } else {
+            console.error('Error al eliminar documento:', data);
+            addSystemMessage(`Error al eliminar documento: ${data.detail || 'Error desconocido'}`);
+        }
+    } catch (error) {
+        console.error('Error al eliminar documento:', error);
+        addSystemMessage(`Error al eliminar documento: ${error.message}`);
+    }
+}
+
+/**
+ * Borra todos los documentos del vector store
+ */
+async function clearAllDocuments() {
+    try {
+        // Mostrar indicador de carga en el botón
+        const confirmBtn = document.getElementById('confirmClearDocsBtn');
+        const originalText = confirmBtn.innerHTML;
+        confirmBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Borrando...';
+        confirmBtn.disabled = true;
+        
+        // Llamada a la API para borrar todos los documentos
+        const response = await fetch('/api/documents', {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const data = await response.json();
+        
+        // Restablecer el botón
+        confirmBtn.innerHTML = originalText;
+        confirmBtn.disabled = false;
+        
+        // Ocultar la confirmación
+        const clearDocsConfirm = document.getElementById('clearDocsConfirm');
+        const clearAllDocsBtn = document.getElementById('clearAllDocsBtn');
+        
+        if (clearDocsConfirm) {
+            clearDocsConfirm.classList.add('d-none');
         }
         
-        // Cerrar modal
-        modals.viewDoc.hide();
+        if (clearAllDocsBtn) {
+            clearAllDocsBtn.classList.remove('d-none');
+        }
         
-        // Mostrar mensaje de éxito
-        addSystemMessage('Documento eliminado correctamente');
-        
-        // Actualizar lista de documentos
-        await loadDocuments();
-        
+        if (response.ok) {
+            // Recargar lista de documentos vacía
+            appState.documents = [];
+            updateDocumentsList();
+            
+            // Cerrar modal si no hay documentos
+            if (appState.documents.length === 0) {
+                setTimeout(() => {
+                    modals.browseDocs.hide();
+                }, 1500);
+            }
+            
+            // Mostrar mensaje de éxito
+            addSystemMessage('Todos los documentos han sido borrados correctamente');
+        } else {
+            console.error('Error al borrar documentos:', data);
+            addSystemMessage(`Error al borrar documentos: ${data.detail || 'Error desconocido'}`);
+        }
     } catch (error) {
-        console.error('Error:', error);
-        alert(`Error al eliminar documento: ${error.message}`);
-    }
-}
-
-/**
- * Maneja la selección de archivos
- * @param {Event} event - Evento de cambio
- */
-function handleFileSelection(event) {
-    const fileInput = event.target;
-    const fileNameDisplay = document.createElement('div');
-    fileNameDisplay.className = 'selected-file-info mt-2';
-    
-    // Eliminar información anterior si existe
-    const previousInfo = fileInput.parentElement.querySelector('.selected-file-info');
-    if (previousInfo) {
-        previousInfo.remove();
-    }
-    
-    if (fileInput.files && fileInput.files.length > 0) {
-        const file = fileInput.files[0];
-        const fileSize = formatFileSize(file.size);
+        console.error('Error al borrar documentos:', error);
+        addSystemMessage(`Error al borrar documentos: ${error.message}`);
         
-        fileNameDisplay.innerHTML = `
-            <div class="d-flex align-items-center">
-                <i class="bi bi-file-earmark-text me-2"></i>
-                <div>
-                    <div class="selected-filename">${file.name}</div>
-                    <div class="selected-filesize">${fileSize}</div>
-                </div>
-            </div>
-        `;
-        
-        fileInput.parentElement.appendChild(fileNameDisplay);
+        // Restablecer la interfaz
+        const confirmBtn = document.getElementById('confirmClearDocsBtn');
+        if (confirmBtn) {
+            confirmBtn.innerHTML = 'Sí, borrar todo';
+            confirmBtn.disabled = false;
+        }
     }
-}
-
-/**
- * Formatea el tamaño del archivo a una representación legible
- * @param {number} bytes - Tamaño en bytes
- * @returns {string} Tamaño formateado
- */
-function formatFileSize(bytes) {
-    if (bytes < 1024) return bytes + ' bytes';
-    else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
-    else return (bytes / 1048576).toFixed(1) + ' MB';
 }
 
 // Inicializar la aplicación al cargar la página

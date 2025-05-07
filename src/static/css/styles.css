@@ -393,8 +393,12 @@ body {
 }
 
 .sidebar .mermaid-diagram {
-    min-height: 200px;
-    font-size: 90%;
+    padding: 8px;
+    min-height: 180px;
+}
+
+.sidebar .mermaid {
+    font-size: 10px;
 }
 
 /* Agent details panel */
@@ -773,14 +777,41 @@ body {
 
 /* Estilos para el diagrama mermaid */
 .mermaid-diagram {
-    background-color: var(--bg-color-secondary);
+    background-color: rgba(0, 0, 0, 0.1);
     border-radius: 8px;
-    padding: 16px;
+    padding: 12px;
     margin: 0 auto;
     max-width: 100%;
     overflow: auto;
-    min-height: 300px;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+    min-height: 200px;
+    transition: all 0.3s ease;
+}
+
+[data-theme="dark"] .mermaid-diagram {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* Clase mermaid generada por la biblioteca */
+.mermaid {
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    display: block;
+    overflow: auto;
+}
+
+/* Mensaje de error del diagrama */
+.diagram-error {
+    color: #ef4444;
+    padding: 10px;
+    background-color: rgba(239, 68, 68, 0.1);
+    border-radius: 6px;
+    font-size: 12px;
+    margin: 10px 0;
+}
+
+[data-theme="dark"] .diagram-error {
+    color: #f87171;
+    background-color: rgba(248, 113, 113, 0.1);
 }
 
 /* Estilos específicos para nodos y aristas del diagrama */
@@ -889,4 +920,18 @@ body {
 
 .progress-bar {
     background-color: var(--primary-color);
+}
+
+/* Estilos específicos para nodos y aristas del diagrama */
+.sidebar .mermaid .node rect, 
+.sidebar .mermaid .node circle, 
+.sidebar .mermaid .node ellipse, 
+.sidebar .mermaid .node polygon, 
+.sidebar .mermaid .node path {
+    stroke-width: 1.5px !important;
+}
+
+/* Estilos para aristas en el sidebar */
+.sidebar .mermaid .edgePath path {
+    stroke-width: 1.5px !important;
 } 

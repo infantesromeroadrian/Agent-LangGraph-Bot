@@ -29,13 +29,16 @@ const diagramConfig = {
 function initWorkflowDiagram() {
     // Cargar mermaid.js desde CDN si no está ya cargado
     if (!window.mermaid) {
+        console.log("Cargando mermaid.js desde CDN...");
         const script = document.createElement('script');
         script.src = 'https://cdn.jsdelivr.net/npm/mermaid@9/dist/mermaid.min.js';
         script.onload = () => {
+            console.log("Mermaid cargado correctamente, configurando...");
             configureAndRenderDiagram();
         };
         document.head.appendChild(script);
     } else {
+        console.log("Mermaid ya está cargado, configurando directamente...");
         configureAndRenderDiagram();
     }
 }
@@ -44,18 +47,28 @@ function initWorkflowDiagram() {
  * Configura y renderiza el diagrama
  */
 function configureAndRenderDiagram() {
-    // Inicializar mermaid
-    mermaid.initialize(diagramConfig);
-    
-    // Renderizar diagrama inicial
-    updateWorkflowDiagram();
-    
-    // Configurar actualización automática cuando cambie el estado de procesamiento
-    setInterval(() => {
-        if (appState.isProcessing) {
+    // Limpiar cualquier instancia anterior
+    try {
+        if (window.mermaid) {
+            // Inicializar mermaid con la configuración
+            window.mermaid.initialize(diagramConfig);
+            
+            // Renderizar diagrama inicial
+            console.log("Renderizando diagrama inicial...");
             updateWorkflowDiagram();
+            
+            // Configurar actualización automática cuando cambie el estado de procesamiento
+            setInterval(() => {
+                if (appState && appState.isProcessing) {
+                    updateWorkflowDiagram();
+                }
+            }, 2000);
+        } else {
+            console.error("Mermaid no está disponible después de la carga");
         }
-    }, 2000);
+    } catch (e) {
+        console.error("Error al inicializar Mermaid:", e);
+    }
 }
 
 /**
@@ -63,19 +76,39 @@ function configureAndRenderDiagram() {
  */
 function updateWorkflowDiagram() {
     const workflowContainer = document.getElementById('workflowDiagram');
-    if (!workflowContainer) return;
+    if (!workflowContainer) {
+        console.warn("Contenedor del diagrama no encontrado");
+        return;
+    }
     
-    // Mapear estados de procesamiento a estado del diagrama
-    mapProcessingToGraph();
-    
-    // Crear definición del diagrama
-    const diagram = createDiagramDefinition();
-    
-    // Actualizar contenedor con el nuevo diagrama
-    workflowContainer.innerHTML = diagram;
-    
-    // Renderizar con mermaid
-    mermaid.init(undefined, workflowContainer);
+    try {
+        // Mapear estados de procesamiento a estado del diagrama
+        mapProcessingToGraph();
+        
+        // Crear definición del diagrama
+        const diagram = createDiagramDefinition();
+        
+        // Limpiar el contenedor para evitar problemas de renderización
+        workflowContainer.innerHTML = '';
+        
+        // Añadir el atributo necesario para mermaid
+        workflowContainer.setAttribute('class', 'mermaid');
+        
+        // Insertar el código del diagrama
+        workflowContainer.textContent = diagram;
+        
+        // Renderizar con mermaid
+        if (window.mermaid && typeof window.mermaid.init === 'function') {
+            window.mermaid.init(undefined, '.mermaid');
+            console.log("Diagrama renderizado correctamente");
+        } else {
+            console.error("Mermaid no está inicializado correctamente");
+        }
+    } catch (e) {
+        console.error("Error al actualizar el diagrama:", e);
+        // Mostrar mensaje de error en el diagrama
+        workflowContainer.innerHTML = `<div class="diagram-error">Error al renderizar el diagrama: ${e.message}</div>`;
+    }
 }
 
 /**

@@ -171,4 +171,39 @@ class VectorStoreService:
             logger.info(f"Deleted document: {document_id}")
         except Exception as e:
             logger.error(f"Error deleting document {document_id}: {e}")
-            logger.error(traceback.format_exc()) 
+            logger.error(traceback.format_exc())
+
+    def clear_all_documents(self) -> bool:
+        """Delete all documents from the vector store.
+        
+        Returns:
+            True if operation was successful, False otherwise
+        """
+        if not self.vector_store:
+            logger.warning("Vector store not initialized, cannot clear documents")
+            return False
+            
+        try:
+            # Get the underlying collection
+            collection = self.vector_store._collection
+            
+            # First, get all document IDs in the collection
+            results = collection.get(include=[])
+            
+            # If there are no documents, we're done
+            if not results or len(results["ids"]) == 0:
+                logger.info("No documents to clear")
+                return True
+                
+            # Delete all documents using their IDs
+            collection.delete(ids=results["ids"])
+            
+            # Reinitialize the vector store
+            self._initialize_vector_store()
+            
+            logger.info(f"Cleared {len(results['ids'])} documents from vector store")
+            return True
+        except Exception as e:
+            logger.error(f"Error clearing documents from vector store: {e}")
+            logger.error(traceback.format_exc())
+            return False 
