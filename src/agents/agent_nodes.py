@@ -22,6 +22,74 @@ class AgentNodes:
         self.vector_store = VectorStoreService()
         self.graph_manager = GraphManagerUtil()
         
+    def language_detection_agent(self, state: GraphState) -> GraphState:
+        """Detect the language used by the user in their query.
+        
+        Args:
+            state: Current graph state
+            
+        Returns:
+            Updated graph state with detected language
+        """
+        # Set current agent
+        state.current_agent = AgentRole.LANGUAGE_DETECTION
+        
+        # Skip if node is disabled
+        if self.graph_manager.should_skip_node(state, AgentRole.LANGUAGE_DETECTION.value):
+            return state
+            
+        # If no query, default to English
+        if not state.human_query or state.human_query.strip() == "":
+            state.detected_language = "en"
+            return state
+            
+        # Create prompt for language detection
+        prompt = create_agent_prompt(
+            AgentRole.LANGUAGE_DETECTION,
+            state.human_query or "",
+            state.messages,
+            []  # No context needed for language detection
+        )
+        
+        # Get response from LLM
+        chain = self.llm_service.create_chain(
+            "{input}",
+        )
+        response = chain.invoke({"input": prompt})
+        
+        # Clean the response to get just the language code
+        lang_code = response.strip().lower()
+        
+        # Validate language code format (should be 2-5 chars)
+        if len(lang_code) < 2 or len(lang_code) > 7:
+            # Default to English if invalid format
+            lang_code = "en"
+            
+        # If the model returned a verbose response, try to extract just the code
+        if len(lang_code) > 7:
+            # Look for common language codes
+            common_codes = ["en", "es", "fr", "de", "it", "pt", "ru", "zh", "ja", "ko", "ar"]
+            for code in common_codes:
+                if code in lang_code:
+                    lang_code = code
+                    break
+            else:
+                # Default to English if no valid code found
+                lang_code = "en"
+                
+        # Update state with detected language
+        state.detected_language = lang_code
+        
+        # Add a system message about the detected language
+        system_msg = create_message(
+            f"Detected language: {lang_code}",
+            MessageType.SYSTEM,
+            "system"
+        )
+        state.messages.append(system_msg)
+        
+        return state
+    
     def retrieve_context(self, state: GraphState) -> GraphState:
         """Retrieve relevant context for the query.
         
@@ -120,12 +188,13 @@ class AgentNodes:
         if self.graph_manager.should_skip_node(state, AgentRole.SOLUTION_ARCHITECT.value):
             return state
         
-        # Create prompt for solution architect
+        # Create prompt for solution architect with detected language
         prompt = create_agent_prompt(
             AgentRole.SOLUTION_ARCHITECT,
             state.human_query or "",
             state.messages,
-            state.context
+            state.context,
+            state.detected_language
         )
         
         # Add relevant thoughts from shared memory if available
@@ -197,19 +266,20 @@ class AgentNodes:
             )
             state.messages.append(system_msg)
         
-        # Create prompt for technical research
+        # Create prompt for technical research with detected language
         prompt = create_agent_prompt(
             AgentRole.TECHNICAL_RESEARCH,
             state.human_query or "",
             state.messages,
-            state.context
+            state.context,
+            state.detected_language
         )
         
-        # Add relevant thoughts from shared memory if available
-        if state.thought_vectors:
+        # Add relevant thoughts from shared memory
+        if state.thought_vectors and state.human_query:
             similar_thoughts = self.graph_manager.find_similar_thoughts(
                 state, 
-                state.human_query or "", 
+                state.human_query, 
                 threshold=0.6
             )
             
@@ -577,43 +647,80 @@ class AgentNodes:
         return state
     
     def client_communication_agent(self, state: GraphState) -> GraphState:
-        """Client Communication agent to format the final response.
+        """Client Communication agent for final response generation.
         
         Args:
             state: Current graph state
             
         Returns:
-            Updated graph state with final response
+            Updated graph state with client communication response
         """
         # Set current agent
         state.current_agent = AgentRole.CLIENT_COMMUNICATION
         
-        # Check if streaming is enabled
+        # Skip if node is disabled
+        if self.graph_manager.should_skip_node(state, AgentRole.CLIENT_COMMUNICATION.value):
+            return state
+        
+        # Handle streaming mode
         if state.is_streaming:
             return self._streaming_client_communication(state)
         
-        # Create prompt for client communication
+        # Collect all thoughts and responses from previous agents
+        previous_responses = []
+        for agent_role, response in state.agent_responses.items():
+            if agent_role != AgentRole.CLIENT_COMMUNICATION and response.content:
+                previous_responses.append(f"{agent_role.value}: {response.content}")
+        
+        # Use the thought vectors to find the most relevant responses
+        if state.thought_vectors and state.human_query:
+            relevant_thoughts = self.graph_manager.find_similar_thoughts(
+                state, 
+                state.human_query, 
+                threshold=0.5,
+                max_results=5
+            )
+            
+            if relevant_thoughts:
+                previous_responses.append("\nMost relevant insights from agents:")
+                for thought in relevant_thoughts:
+                    previous_responses.append(f"- {thought['thought']} (similarity: {thought['similarity']:.2f})")
+        
+        # Combine responses
+        combined_insights = "\n\n".join(previous_responses)
+        
+        # Create a virtual document with combined insights
+        if combined_insights:
+            insight_doc = CompanyDocument(
+                id="agent_insights",
+                title="Combined Agent Insights",
+                content=combined_insights,
+                document_type="internal",
+                source="agent_collaboration"
+            )
+            
+            # Add to context
+            if insight_doc not in state.context:
+                state.context.append(insight_doc)
+        
+        # Create prompt for client communication with detected language
         prompt = create_agent_prompt(
             AgentRole.CLIENT_COMMUNICATION,
             state.human_query or "",
             state.messages,
-            state.context
+            state.context,
+            state.detected_language
         )
         
-        # Include all other agent responses in the prompt
-        agent_responses_text = "Previous Agent Insights:\n"
-        for role, response in state.agent_responses.items():
-            if role != AgentRole.CLIENT_COMMUNICATION:
-                agent_responses_text += f"\n--- {role} Agent ---\n{response.content}\n"
-        
-        # Integrate insights into the prompt
-        full_prompt = f"{prompt}\n\n{agent_responses_text}\n\nPlease formulate a comprehensive final response to the user's query."
+        # Add a reminder to respond in the same language as the user
+        lang_name = self._get_language_name(state.detected_language)
+        prompt += f"\n\nIMPORTANT REMINDER: You must respond in {lang_name} ({state.detected_language}) as this is the language used by the user."
         
         # Get response from LLM
         chain = self.llm_service.create_chain(
             "{input}",
         )
-        response = chain.invoke({"input": full_prompt})
+        response = chain.invoke({"input": prompt})
         
         # Create agent response
         agent_response = create_agent_response(
@@ -622,11 +729,160 @@ class AgentNodes:
             sources=[doc.id for doc in state.context],
         )
         
-        # Update state
-        state.agent_responses[AgentRole.CLIENT_COMMUNICATION] = agent_response
+        # Set final response in the state
         state.final_response = response
         
+        # Update state
+        state.agent_responses[AgentRole.CLIENT_COMMUNICATION] = agent_response
+        
         return state
+        
+    def _get_language_name(self, language_code: str) -> str:
+        """Get the full language name from the ISO code.
+        
+        Args:
+            language_code: ISO language code
+            
+        Returns:
+            Full language name
+        """
+        language_map = {
+            "en": "English",
+            "es": "Spanish",
+            "fr": "French",
+            "de": "German",
+            "it": "Italian",
+            "pt": "Portuguese",
+            "ru": "Russian",
+            "zh": "Chinese",
+            "ja": "Japanese",
+            "ko": "Korean",
+            "ar": "Arabic"
+        }
+        
+        return language_map.get(language_code, "the detected language")
+
+    def process_user_query(self, query: str, conversation_history: Optional[List[Dict]] = None, streaming: bool = False) -> Dict[str, Any]:
+        """Process a user query through the agent workflow.
+        
+        Args:
+            query: User query
+            conversation_history: Previous conversation messages
+            streaming: Whether to stream responses
+            
+        Returns:
+            Dictionary with agent responses and final response
+        """
+        # Create initial state
+        state = GraphState(
+            human_query=query,
+            is_streaming=streaming
+        )
+        
+        # Convert conversation history to messages if provided
+        if conversation_history:
+            for msg in conversation_history:
+                if msg.get("type") == "human":
+                    state.messages.append(create_message(
+                        msg.get("content", ""),
+                        MessageType.HUMAN,
+                        msg.get("sender", "user")
+                    ))
+                elif msg.get("type") == "ai":
+                    state.messages.append(create_message(
+                        msg.get("content", ""),
+                        MessageType.AI,
+                        msg.get("sender", "assistant")
+                    ))
+        
+        # Add the current query as a message
+        state.messages.append(create_message(
+            query,
+            MessageType.HUMAN,
+            "user"
+        ))
+        
+        # Set up the graph manager for this query
+        self.graph_manager.initialize(query)
+        
+        # Process the query through the workflow
+        try:
+            # Get the graph - used to be a simple function call:
+            # from src.graph.agent_graph import create_agent_graph
+            # graph = create_agent_graph(self)
+            
+            # Now with dynamic agent graph
+            from src.graph.agent_graph import DynamicAgentGraph
+            dynamic_graph = DynamicAgentGraph(self)
+            graph = dynamic_graph.get_compiled_graph()
+            
+            # Execute the graph
+            result = graph.invoke(state)
+            
+            # Handle different result types from LangGraph
+            # LangGraph 0.0.x returned a GraphState object directly
+            # LangGraph 0.1.x returns an AddableValuesDict which needs special handling
+            
+            # Create response object
+            response = {
+                "agent_responses": {},
+                "final_response": ""
+            }
+            
+            # Determine the type of result and extract data accordingly
+            if hasattr(result, 'get') and callable(getattr(result, 'get')):
+                # It's an AddableValuesDict or similar dict-like object
+                final_response = result.get('final_response', "")
+                agent_responses = result.get('agent_responses', {})
+                detected_language = result.get('detected_language', "en")
+            elif isinstance(result, dict):
+                # It's a regular dictionary
+                final_response = result.get('final_response', "")
+                agent_responses = result.get('agent_responses', {})
+                detected_language = result.get('detected_language', "en")
+            else:
+                # Assume it's a GraphState object (older LangGraph versions)
+                final_response = getattr(result, 'final_response', "")
+                agent_responses = getattr(result, 'agent_responses', {})
+                detected_language = getattr(result, 'detected_language', "en")
+            
+            # Set final response
+            response["final_response"] = final_response
+            
+            # Add individual agent responses
+            for role, agent_response in agent_responses.items():
+                if hasattr(agent_response, 'content'):
+                    # It's an AgentResponse object
+                    response["agent_responses"][role] = {
+                        "content": agent_response.content,
+                        "confidence": getattr(agent_response, 'confidence', 1.0),
+                        "sources": getattr(agent_response, 'sources', [])
+                    }
+                elif isinstance(agent_response, dict):
+                    # It's already a dictionary
+                    response["agent_responses"][role] = agent_response
+            
+            # Add detected language info
+            response["detected_language"] = detected_language
+            
+            # If we don't have a final response yet, use a default message based on the detected language
+            if not response["final_response"]:
+                if detected_language == "es":
+                    response["final_response"] = "Lo siento, no pude generar una respuesta completa. ¿Podrías reformular tu pregunta?"
+                else:
+                    response["final_response"] = "I'm sorry, I couldn't generate a complete response. Could you please rephrase your question?"
+                
+            return response
+            
+        except Exception as e:
+            import traceback
+            print(f"Error in agent workflow: {e}")
+            print(traceback.format_exc())
+            return {
+                "agent_responses": {},
+                "final_response": f"Lo siento, ocurrió un error al procesar tu consulta. Por favor, inténtalo de nuevo. Error: {str(e)}",
+                "detected_language": getattr(state, 'detected_language', "es")
+            }
     
     def _streaming_client_communication(self, state: GraphState) -> GraphState:
         """Versión streaming del agente de comunicación con el cliente.
@@ -812,74 +1068,429 @@ class AgentNodes:
         else:
             return "skip_data_analysis"
     
-    def process_user_query(self, query: str, conversation_history: Optional[List[Dict]] = None, streaming: bool = False) -> Dict[str, Any]:
-        """Process a user query through the agent workflow.
+    def digital_transformation_agent(self, state: GraphState) -> GraphState:
+        """Digital Transformation agent for evaluating digital maturity and proposing strategies.
         
         Args:
-            query: User query text
-            conversation_history: Optional list of previous conversation messages
-            streaming: Whether to enable streaming responses
+            state: Current graph state
             
         Returns:
-            Dictionary with the processing results
+            Updated graph state with digital transformation assessment
         """
-        # Initialize graph state
-        state = GraphState(
-            human_query=query,
-            is_streaming=streaming
+        # Set current agent
+        state.current_agent = AgentRole.DIGITAL_TRANSFORMATION
+        
+        # Skip if node is disabled
+        if self.graph_manager.should_skip_node(state, AgentRole.DIGITAL_TRANSFORMATION.value):
+            return state
+        
+        # Create prompt for digital transformation
+        prompt = create_agent_prompt(
+            AgentRole.DIGITAL_TRANSFORMATION,
+            state.human_query or "",
+            state.messages,
+            state.context
         )
         
-        # Convert conversation history to Message objects
-        if conversation_history:
-            for message in conversation_history:
-                msg_type = message.get("type", MessageType.HUMAN)
-                msg = create_message(
-                    content=message.get("content", ""),
-                    message_type=msg_type,
-                    sender=message.get("sender", "user" if msg_type == MessageType.HUMAN else "assistant")
-                )
-                state.messages.append(msg)
+        # Add relevant thoughts from shared memory if available
+        if state.thought_vectors and state.human_query:
+            similar_thoughts = self.graph_manager.find_similar_thoughts(
+                state, 
+                state.human_query,
+                threshold=0.6
+            )
+            
+            if similar_thoughts:
+                prompt += "\n\nRelevant thoughts from other agents:\n"
+                for thought in similar_thoughts:
+                    prompt += f"- {thought['thought']} (similarity: {thought['similarity']:.2f})\n"
         
-        # Add the current query as a message
-        msg = create_message(
-            content=query,
-            message_type=MessageType.HUMAN,
-            sender="user"
+        # Get response from LLM
+        chain = self.llm_service.create_chain(
+            "{input}",
         )
-        state.messages.append(msg)
+        response = chain.invoke({"input": prompt})
         
-        # Get the graph from the create_agent_graph function
-        from src.graph.agent_graph import create_agent_graph
-        graph = create_agent_graph(self)
+        # Create agent response
+        agent_response = create_agent_response(
+            content=response,
+            agent_role=AgentRole.DIGITAL_TRANSFORMATION,
+            sources=[doc.id for doc in state.context],
+        )
         
-        # Run the workflow
-        final_state = graph.invoke(state)
+        # Add thought vector to shared memory
+        self.graph_manager.add_thought_to_shared_memory(
+            state,
+            AgentRole.DIGITAL_TRANSFORMATION,
+            response
+        )
         
-        # Manejar correctamente el tipo AddableValuesDict para las versiones nuevas de LangGraph
-        if not isinstance(final_state, dict) and hasattr(final_state, "get"):
-            # Es un AddableValuesDict, acceder usando .get()
-            return {
-                "final_response": final_state.get("final_response", ""),
-                "agent_responses": final_state.get("agent_responses", {}),
-                "context": final_state.get("context", []),
-                "is_streaming": final_state.get("is_streaming", False),
-                "partial_responses": final_state.get("partial_responses", {}) if final_state.get("is_streaming", False) else {}
-            }
-        elif isinstance(final_state, dict):
-            # Ya es un diccionario normal
-            return {
-                "final_response": final_state.get("final_response", ""),
-                "agent_responses": final_state.get("agent_responses", {}),
-                "context": final_state.get("context", []),
-                "is_streaming": final_state.get("is_streaming", False),
-                "partial_responses": final_state.get("partial_responses", {}) if final_state.get("is_streaming", False) else {}
-            }
+        # Update state
+        state.agent_responses[AgentRole.DIGITAL_TRANSFORMATION] = agent_response
+        
+        return state
+        
+    def cloud_architecture_agent(self, state: GraphState) -> GraphState:
+        """Cloud Architecture agent for designing cloud solutions and migration strategies.
+        
+        Args:
+            state: Current graph state
+            
+        Returns:
+            Updated graph state with cloud architecture recommendations
+        """
+        # Set current agent
+        state.current_agent = AgentRole.CLOUD_ARCHITECTURE
+        
+        # Skip if node is disabled
+        if self.graph_manager.should_skip_node(state, AgentRole.CLOUD_ARCHITECTURE.value):
+            return state
+        
+        # Create prompt for cloud architecture
+        prompt = create_agent_prompt(
+            AgentRole.CLOUD_ARCHITECTURE,
+            state.human_query or "",
+            state.messages,
+            state.context
+        )
+        
+        # Add relevant thoughts from shared memory if available
+        if state.thought_vectors and state.human_query:
+            similar_thoughts = self.graph_manager.find_similar_thoughts(
+                state, 
+                state.human_query,
+                threshold=0.6
+            )
+            
+            if similar_thoughts:
+                prompt += "\n\nRelevant thoughts from other agents:\n"
+                for thought in similar_thoughts:
+                    prompt += f"- {thought['thought']} (similarity: {thought['similarity']:.2f})\n"
+                    
+        # Get response from LLM
+        chain = self.llm_service.create_chain(
+            "{input}",
+        )
+        response = chain.invoke({"input": prompt})
+        
+        # Create agent response
+        agent_response = create_agent_response(
+            content=response,
+            agent_role=AgentRole.CLOUD_ARCHITECTURE,
+            sources=[doc.id for doc in state.context],
+        )
+        
+        # Add thought vector to shared memory
+        self.graph_manager.add_thought_to_shared_memory(
+            state,
+            AgentRole.CLOUD_ARCHITECTURE,
+            response
+        )
+        
+        # Update state
+        state.agent_responses[AgentRole.CLOUD_ARCHITECTURE] = agent_response
+        
+        return state
+        
+    def cyber_security_agent(self, state: GraphState) -> GraphState:
+        """Cyber Security agent for assessing security risks and recommending controls.
+        
+        Args:
+            state: Current graph state
+            
+        Returns:
+            Updated graph state with security recommendations
+        """
+        # Set current agent
+        state.current_agent = AgentRole.CYBER_SECURITY
+        
+        # Skip if node is disabled
+        if self.graph_manager.should_skip_node(state, AgentRole.CYBER_SECURITY.value):
+            return state
+        
+        # Create prompt for cyber security
+        prompt = create_agent_prompt(
+            AgentRole.CYBER_SECURITY,
+            state.human_query or "",
+            state.messages,
+            state.context
+        )
+        
+        # Add relevant thoughts from shared memory if available
+        if state.thought_vectors and state.human_query:
+            similar_thoughts = self.graph_manager.find_similar_thoughts(
+                state, 
+                state.human_query,
+                threshold=0.6
+            )
+            
+            if similar_thoughts:
+                prompt += "\n\nRelevant thoughts from other agents:\n"
+                for thought in similar_thoughts:
+                    prompt += f"- {thought['thought']} (similarity: {thought['similarity']:.2f})\n"
+                    
+        # Get response from LLM
+        chain = self.llm_service.create_chain(
+            "{input}",
+        )
+        response = chain.invoke({"input": prompt})
+        
+        # Create agent response
+        agent_response = create_agent_response(
+            content=response,
+            agent_role=AgentRole.CYBER_SECURITY,
+            sources=[doc.id for doc in state.context],
+        )
+        
+        # Add thought vector to shared memory
+        self.graph_manager.add_thought_to_shared_memory(
+            state,
+            AgentRole.CYBER_SECURITY,
+            response
+        )
+        
+        # Update state
+        state.agent_responses[AgentRole.CYBER_SECURITY] = agent_response
+        
+        return state
+        
+    def agile_methodologies_agent(self, state: GraphState) -> GraphState:
+        """Agile Methodologies agent for recommending agile practices and transformations.
+        
+        Args:
+            state: Current graph state
+            
+        Returns:
+            Updated graph state with agile methodology recommendations
+        """
+        # Set current agent
+        state.current_agent = AgentRole.AGILE_METHODOLOGIES
+        
+        # Skip if node is disabled
+        if self.graph_manager.should_skip_node(state, AgentRole.AGILE_METHODOLOGIES.value):
+            return state
+        
+        # Create prompt for agile methodologies
+        prompt = create_agent_prompt(
+            AgentRole.AGILE_METHODOLOGIES,
+            state.human_query or "",
+            state.messages,
+            state.context
+        )
+        
+        # Add relevant thoughts from shared memory if available
+        if state.thought_vectors and state.human_query:
+            similar_thoughts = self.graph_manager.find_similar_thoughts(
+                state, 
+                state.human_query,
+                threshold=0.6
+            )
+            
+            if similar_thoughts:
+                prompt += "\n\nRelevant thoughts from other agents:\n"
+                for thought in similar_thoughts:
+                    prompt += f"- {thought['thought']} (similarity: {thought['similarity']:.2f})\n"
+                    
+        # Get response from LLM
+        chain = self.llm_service.create_chain(
+            "{input}",
+        )
+        response = chain.invoke({"input": prompt})
+        
+        # Create agent response
+        agent_response = create_agent_response(
+            content=response,
+            agent_role=AgentRole.AGILE_METHODOLOGIES,
+            sources=[doc.id for doc in state.context],
+        )
+        
+        # Add thought vector to shared memory
+        self.graph_manager.add_thought_to_shared_memory(
+            state,
+            AgentRole.AGILE_METHODOLOGIES,
+            response
+        )
+        
+        # Update state
+        state.agent_responses[AgentRole.AGILE_METHODOLOGIES] = agent_response
+        
+        return state
+        
+    def systems_integration_agent(self, state: GraphState) -> GraphState:
+        """Systems Integration agent for designing integration solutions.
+        
+        Args:
+            state: Current graph state
+            
+        Returns:
+            Updated graph state with systems integration recommendations
+        """
+        # Set current agent
+        state.current_agent = AgentRole.SYSTEMS_INTEGRATION
+        
+        # Skip if node is disabled
+        if self.graph_manager.should_skip_node(state, AgentRole.SYSTEMS_INTEGRATION.value):
+            return state
+        
+        # Create prompt for systems integration
+        prompt = create_agent_prompt(
+            AgentRole.SYSTEMS_INTEGRATION,
+            state.human_query or "",
+            state.messages,
+            state.context
+        )
+        
+        # Add relevant thoughts from shared memory if available
+        if state.thought_vectors and state.human_query:
+            similar_thoughts = self.graph_manager.find_similar_thoughts(
+                state, 
+                state.human_query,
+                threshold=0.6
+            )
+            
+            if similar_thoughts:
+                prompt += "\n\nRelevant thoughts from other agents:\n"
+                for thought in similar_thoughts:
+                    prompt += f"- {thought['thought']} (similarity: {thought['similarity']:.2f})\n"
+                    
+        # Get response from LLM
+        chain = self.llm_service.create_chain(
+            "{input}",
+        )
+        response = chain.invoke({"input": prompt})
+        
+        # Create agent response
+        agent_response = create_agent_response(
+            content=response,
+            agent_role=AgentRole.SYSTEMS_INTEGRATION,
+            sources=[doc.id for doc in state.context],
+        )
+        
+        # Add thought vector to shared memory
+        self.graph_manager.add_thought_to_shared_memory(
+            state,
+            AgentRole.SYSTEMS_INTEGRATION,
+            response
+        )
+        
+        # Update state
+        state.agent_responses[AgentRole.SYSTEMS_INTEGRATION] = agent_response
+        
+        return state
+
+    # Métodos para decidir si usar los nuevos agentes especializados
+    
+    def should_use_digital_transformation(self, state: GraphState) -> str:
+        """Determine if the Digital Transformation agent should be used.
+        
+        Args:
+            state: Current graph state
+            
+        Returns:
+            Decision string ('use_digital_transformation' or 'skip_digital_transformation')
+        """
+        query_lower = (state.human_query or "").lower()
+        
+        # Buscar términos relacionados con transformación digital
+        digital_keywords = [
+            "digital transformation", "digital maturity", "digital strategy", 
+            "digitalization", "digital initiative", "digital roadmap", "digital adoption",
+            "transformación digital", "madurez digital", "digitalización"
+        ]
+        
+        if any(keyword in query_lower for keyword in digital_keywords):
+            return "use_digital_transformation"
         else:
-            # Intentar acceder directamente a los atributos de GraphState
-            return {
-                "final_response": getattr(final_state, "final_response", ""),
-                "agent_responses": getattr(final_state, "agent_responses", {}),
-                "context": getattr(final_state, "context", []),
-                "is_streaming": getattr(final_state, "is_streaming", False),
-                "partial_responses": getattr(final_state, "partial_responses", {}) if getattr(final_state, "is_streaming", False) else {}
-            } 
+            return "skip_digital_transformation"
+    
+    def should_use_cloud_architecture(self, state: GraphState) -> str:
+        """Determine if the Cloud Architecture agent should be used.
+        
+        Args:
+            state: Current graph state
+            
+        Returns:
+            Decision string ('use_cloud_architecture' or 'skip_cloud_architecture')
+        """
+        query_lower = (state.human_query or "").lower()
+        
+        # Buscar términos relacionados con arquitectura cloud
+        cloud_keywords = [
+            "cloud", "aws", "azure", "gcp", "google cloud", "migration", "iaas", "paas", 
+            "saas", "serverless", "container", "kubernetes", "docker", "microservices",
+            "nube", "migración", "infraestructura", "contenedores"
+        ]
+        
+        if any(keyword in query_lower for keyword in cloud_keywords):
+            return "use_cloud_architecture"
+        else:
+            return "skip_cloud_architecture"
+    
+    def should_use_cyber_security(self, state: GraphState) -> str:
+        """Determine if the Cyber Security agent should be used.
+        
+        Args:
+            state: Current graph state
+            
+        Returns:
+            Decision string ('use_cyber_security' or 'skip_cyber_security')
+        """
+        query_lower = (state.human_query or "").lower()
+        
+        # Buscar términos relacionados con seguridad
+        security_keywords = [
+            "security", "vulnerability", "threat", "risk", "hack", "breach", "compliance", 
+            "authentication", "authorization", "encryption", "firewall", "malware", "virus",
+            "seguridad", "vulnerabilidad", "amenaza", "riesgo", "ataque", "protección"
+        ]
+        
+        if any(keyword in query_lower for keyword in security_keywords):
+            return "use_cyber_security"
+        else:
+            return "skip_cyber_security"
+    
+    def should_use_agile_methodologies(self, state: GraphState) -> str:
+        """Determine if the Agile Methodologies agent should be used.
+        
+        Args:
+            state: Current graph state
+            
+        Returns:
+            Decision string ('use_agile_methodologies' or 'skip_agile_methodologies')
+        """
+        query_lower = (state.human_query or "").lower()
+        
+        # Buscar términos relacionados con metodologías ágiles
+        agile_keywords = [
+            "agile", "scrum", "kanban", "sprint", "backlog", "retrospective", "standup", 
+            "user story", "product owner", "scrum master", "extreme programming", "xp",
+            "ágil", "metodología", "ceremonia", "historia de usuario", "dueño de producto"
+        ]
+        
+        if any(keyword in query_lower for keyword in agile_keywords):
+            return "use_agile_methodologies"
+        else:
+            return "skip_agile_methodologies"
+    
+    def should_use_systems_integration(self, state: GraphState) -> str:
+        """Determine if the Systems Integration agent should be used.
+        
+        Args:
+            state: Current graph state
+            
+        Returns:
+            Decision string ('use_systems_integration' or 'skip_systems_integration')
+        """
+        query_lower = (state.human_query or "").lower()
+        
+        # Buscar términos relacionados con integración de sistemas
+        integration_keywords = [
+            "integration", "api", "middleware", "interface", "connect", "interoperability", 
+            "data exchange", "soa", "esb", "etl", "webhook", "microservice", "message queue",
+            "integración", "conectar", "interfaz", "interoperabilidad", "intercambio de datos"
+        ]
+        
+        if any(keyword in query_lower for keyword in integration_keywords):
+            return "use_systems_integration"
+        else:
+            return "skip_systems_integration" 

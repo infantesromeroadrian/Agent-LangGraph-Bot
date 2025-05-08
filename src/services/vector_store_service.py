@@ -173,6 +173,32 @@ class VectorStoreService:
             logger.error(f"Error deleting document {document_id}: {e}")
             logger.error(traceback.format_exc())
 
+    def count_documents(self) -> int:
+        """Cuenta el número de documentos en el vector store.
+        
+        Returns:
+            Número de documentos en el vector store
+        """
+        if not self.vector_store:
+            logger.warning("Vector store not initialized, cannot count documents")
+            return 0
+            
+        try:
+            # Get the underlying collection
+            collection = self.vector_store._collection
+            
+            # Get all document IDs in the collection
+            results = collection.get(include=[])
+            
+            # Return the count of document IDs
+            count = len(results["ids"]) if results and "ids" in results else 0
+            logger.info(f"Document count in vector store: {count}")
+            return count
+        except Exception as e:
+            logger.error(f"Error counting documents in vector store: {e}")
+            logger.error(traceback.format_exc())
+            return 0
+
     def clear_all_documents(self) -> bool:
         """Delete all documents from the vector store.
         

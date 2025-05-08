@@ -13,6 +13,14 @@ class AgentRole(str, Enum):
     CLIENT_COMMUNICATION = "client_communication"
     MARKET_ANALYSIS = "market_analysis"
     DATA_ANALYSIS = "data_analysis"
+    # Nuevos roles para consultora tecnológica
+    DIGITAL_TRANSFORMATION = "digital_transformation"
+    CLOUD_ARCHITECTURE = "cloud_architecture"
+    CYBER_SECURITY = "cyber_security"
+    AGILE_METHODOLOGIES = "agile_methodologies"
+    SYSTEMS_INTEGRATION = "systems_integration"
+    # Nuevo rol para detección de idioma
+    LANGUAGE_DETECTION = "language_detection"
 
 
 class MessageType(str, Enum):
@@ -101,4 +109,6 @@ class GraphState(BaseModel):
     disabled_nodes: List[str] = Field(default_factory=list)
     # Control de streaming
     is_streaming: bool = False
-    partial_responses: Dict[str, AgentResponse] = Field(default_factory=dict) 
+    partial_responses: Dict[str, AgentResponse] = Field(default_factory=dict)
+    # Campo para el idioma detectado del usuario
+    detected_language: str = "en" 

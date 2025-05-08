@@ -21,6 +21,21 @@ class GraphManagerUtil:
         """
         # Initialize embeddings model for thought vectors if not provided
         self.embeddings = embeddings_model or OpenAIEmbeddings()
+        # Add a field to store the current query
+        self.current_query = None
+    
+    def initialize(self, query: str):
+        """Initialize the graph manager for a new query.
+        
+        Args:
+            query: The user query to process
+        """
+        # Store the current query
+        self.current_query = query
+        logger.info(f"Initialized graph manager for query: {query}")
+        
+        # Reset any per-query state here if needed in the future
+        # For now, this is a simple initialization
     
     def modify_state_for_dynamic_execution(self, state: GraphState) -> GraphState:
         """Process state to handle dynamic graph execution.

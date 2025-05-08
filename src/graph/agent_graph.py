@@ -24,7 +24,8 @@ class DynamicAgentGraph:
         # Create a new graph
         workflow = StateGraph(GraphState)
         
-        # Add nodes to the graph
+        # Add nodes to the graph - Base agents
+        workflow.add_node("language_detection", self.agent_nodes.language_detection_agent)
         workflow.add_node("retrieve_context", self.agent_nodes.retrieve_context)
         workflow.add_node("solution_architect", self.agent_nodes.solution_architect_agent)
         workflow.add_node("technical_research", self.agent_nodes.technical_research_agent)
@@ -34,12 +35,21 @@ class DynamicAgentGraph:
         workflow.add_node("data_analysis", self.agent_nodes.data_analysis_agent)
         workflow.add_node("client_communication", self.agent_nodes.client_communication_agent)
         
+        # Add nodes for new consulting agents
+        workflow.add_node("digital_transformation", self.agent_nodes.digital_transformation_agent)
+        workflow.add_node("cloud_architecture", self.agent_nodes.cloud_architecture_agent)
+        workflow.add_node("cyber_security", self.agent_nodes.cyber_security_agent)
+        workflow.add_node("agile_methodologies", self.agent_nodes.agile_methodologies_agent)
+        workflow.add_node("systems_integration", self.agent_nodes.systems_integration_agent)
+        
         # Define the workflow edges
-        workflow.set_entry_point("retrieve_context")
+        # Start with language detection
+        workflow.set_entry_point("language_detection")
+        workflow.add_edge("language_detection", "retrieve_context")
         workflow.add_edge("retrieve_context", "solution_architect")
         workflow.add_edge("solution_architect", "technical_research")
         
-        # Conditional edges based on whether to use specialized agents
+        # Conditional edges for specialized agents - Base path
         workflow.add_conditional_edges(
             "technical_research",
             self.agent_nodes.should_use_code_review,
@@ -77,6 +87,61 @@ class DynamicAgentGraph:
         )
         
         workflow.add_edge("data_analysis", "client_communication")
+        
+        # Create a mock state for static checks during initialization
+        mock_state = GraphState(human_query="")
+        
+        # New conditional edges for consulting specialized agents
+        workflow.add_conditional_edges(
+            "technical_research",
+            self.agent_nodes.should_use_digital_transformation,
+            {
+                "use_digital_transformation": "digital_transformation",
+                "skip_digital_transformation": "code_review" if self.agent_nodes.should_use_code_review(mock_state) == "use_code_review" else "project_management"
+            }
+        )
+        
+        workflow.add_conditional_edges(
+            "digital_transformation",
+            self.agent_nodes.should_use_cloud_architecture,
+            {
+                "use_cloud_architecture": "cloud_architecture",
+                "skip_cloud_architecture": "cyber_security" if self.agent_nodes.should_use_cyber_security(mock_state) == "use_cyber_security" else "code_review"
+            }
+        )
+        
+        workflow.add_conditional_edges(
+            "cloud_architecture",
+            self.agent_nodes.should_use_cyber_security,
+            {
+                "use_cyber_security": "cyber_security",
+                "skip_cyber_security": "code_review" if self.agent_nodes.should_use_code_review(mock_state) == "use_code_review" else "project_management"
+            }
+        )
+        
+        workflow.add_edge("cyber_security", "code_review")
+        
+        workflow.add_conditional_edges(
+            "project_management", 
+            self.agent_nodes.should_use_agile_methodologies,
+            {
+                "use_agile_methodologies": "agile_methodologies",
+                "skip_agile_methodologies": "market_analysis" if self.agent_nodes.should_use_market_analysis(mock_state) == "use_market_analysis" else "data_analysis"
+            }
+        )
+        
+        workflow.add_edge("agile_methodologies", "market_analysis")
+        
+        workflow.add_conditional_edges(
+            "data_analysis",
+            self.agent_nodes.should_use_systems_integration,
+            {
+                "use_systems_integration": "systems_integration",
+                "skip_systems_integration": "client_communication"
+            }
+        )
+        
+        workflow.add_edge("systems_integration", "client_communication")
         workflow.add_edge("client_communication", END)
         
         self.graph = workflow
