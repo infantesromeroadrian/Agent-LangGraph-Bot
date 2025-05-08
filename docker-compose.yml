@@ -9,8 +9,10 @@ services:
     ports:
       - "5800:8000"
     volumes:
-      - .:/app
+      - ./src:/app/src
+      - ./frontend:/app/frontend
       - ./data:/app/data
+      - ./.env:/app/.env
     env_file:
       - .env
     restart: unless-stopped

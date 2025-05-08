@@ -42,6 +42,22 @@
                             <i class="bi bi-search me-1"></i> Explorar Documentos
                         </button>
                     </div>
+                    <!-- Añadir sección de observabilidad avanzada -->
+                    <hr>
+                    <div class="advanced-features mb-3">
+                        <h5>Características Avanzadas</h5>
+                        <button class="btn btn-sm btn-outline-light w-100 mb-2" id="observabilityBtn">
+                            <i class="bi bi-eye me-1"></i> Activar Observabilidad
+                        </button>
+                        <div class="form-check form-switch mt-2">
+                            <input class="form-check-input" type="checkbox" id="parallelExecutionSwitch">
+                            <label class="form-check-label" for="parallelExecutionSwitch">Ejecución Paralela</label>
+                        </div>
+                        <div class="form-check form-switch mt-2">
+                            <input class="form-check-input" type="checkbox" id="feedbackLoopSwitch">
+                            <label class="form-check-label" for="feedbackLoopSwitch">Ciclos de Refinamiento</label>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -178,6 +194,57 @@
                     </div>
                 </div>
             </div>
+            
+            <!-- Observability Panel - Nuevo panel para trazas de LangSmith -->
+            <div class="col-md-3 col-lg-3 agent-sidebar d-none" id="observabilityPanel">
+                <div class="agent-sidebar-container">
+                    <div class="sidebar-header">
+                        <h4>Observabilidad LangSmith</h4>
+                        <button type="button" class="btn-close text-white" id="closeObservabilityBtn" aria-label="Close"></button>
+                    </div>
+                    
+                    <div class="alert alert-info mb-3">
+                        <small>Observabilidad avanzada permite visualizar en detalle el proceso completo de los agentes.</small>
+                    </div>
+                    
+                    <div class="observability-status mb-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span>Estado:</span>
+                            <span class="badge bg-secondary" id="observabilityStatus">Inactivo</span>
+                        </div>
+                    </div>
+                    
+                    <div class="trace-info mb-3 d-none" id="traceInfoContainer">
+                        <h6>Información de Trazas</h6>
+                        <div class="card bg-dark border-secondary">
+                            <div class="card-body">
+                                <div class="mb-2">
+                                    <small class="text-muted">Proyecto:</small>
+                                    <div id="traceProjectName">-</div>
+                                </div>
+                                <div class="mb-2">
+                                    <small class="text-muted">ID de Ejecución:</small>
+                                    <div id="traceRunId">-</div>
+                                </div>
+                                <div class="text-center mt-3">
+                                    <a href="#" class="btn btn-sm btn-outline-primary d-none" id="traceDashboardLink" target="_blank">
+                                        <i class="bi bi-box-arrow-up-right me-1"></i> Ver en LangSmith
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="trace-nodes mb-3">
+                        <h6>Nodos del Grafo</h6>
+                        <div id="traceNodesContainer" class="card bg-dark border-secondary p-2">
+                            <div class="text-center text-muted py-4">
+                                No hay datos de trazas disponibles
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -189,6 +256,11 @@
     <!-- Agent processing toggle button -->
     <button class="agent-toggle d-none" id="agentToggle" title="Ver estado de los agentes">
         <i class="bi bi-robot"></i>
+    </button>
+    
+    <!-- Observability toggle button -->
+    <button class="observability-toggle d-none" id="observabilityToggle" title="Ver observabilidad">
+        <i class="bi bi-eye"></i>
     </button>
 
     <!-- Agent details panel (deprecated but kept for compatibility) -->
@@ -477,8 +549,16 @@
         </div>
     </div>
 
-    <!-- JavaScript -->
+    <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script src="/static/js/app.js"></script>
+    <script src="/static/js/advanced-features.js"></script>
+    
+    <script>
+        // Código para inicializar las funcionalidades de la aplicación
+        document.addEventListener('DOMContentLoaded', function() {
+            // Código existente
+        });
+    </script>
 </body>
 </html> 

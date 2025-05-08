@@ -53,13 +53,13 @@ app.add_middleware(
 app.include_router(api_router)
 
 # Mount static files
-app.mount("/static", StaticFiles(directory="src/static"), name="static")
+app.mount("/static", StaticFiles(directory="frontend"), name="static")
 
 
 @app.get("/")
 async def root():
     """Serve the main HTML page."""
-    return FileResponse("src/static/index.html")
+    return FileResponse("frontend/index.html")
 
 
 @app.get("/health")

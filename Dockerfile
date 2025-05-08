@@ -11,8 +11,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy source code
-COPY . .
+# Copy frontend and source code
+COPY frontend/ /app/frontend/
+COPY src/ /app/src/
+COPY .env /app/
 
 # Set environment variables
 ENV PYTHONPATH=/app

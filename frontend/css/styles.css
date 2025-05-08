@@ -934,4 +934,135 @@ body {
 /* Estilos para aristas en el sidebar */
 .sidebar .mermaid .edgePath path {
     stroke-width: 1.5px !important;
+}
+
+/* Estilos del panel de observabilidad */
+.observability-toggle {
+    position: fixed;
+    bottom: 6rem;
+    right: 1rem;
+    width: 3rem;
+    height: 3rem;
+    border-radius: 50%;
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 999;
+    opacity: 0.8;
+    transition: all 0.3s ease;
+}
+
+.observability-toggle:hover {
+    opacity: 1;
+    transform: scale(1.05);
+}
+
+.observability-toggle i {
+    font-size: 1.2rem;
+}
+
+/* Estilos para el panel de observabilidad */
+#observabilityPanel {
+    background-color: var(--sidebar-bg);
+    color: var(--text-color);
+    height: 100vh;
+    overflow-y: auto;
+    transition: all 0.3s ease;
+    border-left: 1px solid var(--border-color);
+}
+
+#observabilityPanel .agent-sidebar-container {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    padding: 1rem;
+}
+
+#observabilityPanel .sidebar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+#observabilityPanel .sidebar-header h4 {
+    margin: 0;
+    font-size: 1.2rem;
+}
+
+.trace-info .card, .trace-nodes .card {
+    background-color: var(--card-bg) !important;
+    border: 1px solid var(--border-color) !important;
+}
+
+.trace-node-item {
+    border-left: 3px solid var(--primary-color);
+    padding: 0.5rem 0.75rem;
+    margin-bottom: 0.5rem;
+    background-color: rgba(255, 255, 255, 0.05);
+    border-radius: 0.25rem;
+}
+
+.trace-node-item.active {
+    border-left-color: var(--success-color);
+    background-color: rgba(40, 167, 69, 0.1);
+}
+
+.trace-node-item .node-name {
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.trace-node-item .node-time {
+    font-size: 0.75rem;
+    opacity: 0.7;
+}
+
+.trace-node-item .node-status {
+    font-size: 0.75rem;
+    margin-top: 0.25rem;
+}
+
+/* Estilos para las características avanzadas en la barra lateral */
+.advanced-features h5 {
+    font-size: 1rem;
+    margin-bottom: 0.75rem;
+}
+
+.advanced-features .form-check-input {
+    background-color: var(--input-bg);
+    border-color: var(--border-color);
+}
+
+.advanced-features .form-check-input:checked {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+.advanced-features .form-check-label {
+    font-size: 0.85rem;
+    color: var(--text-color);
+}
+
+/* Responsive fixes for the observability panel */
+@media (max-width: 767.98px) {
+    #observabilityPanel {
+        position: fixed;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: 85%;
+        z-index: 1040;
+        transform: translateX(100%);
+    }
+    
+    #observabilityPanel.show {
+        transform: translateX(0);
+    }
 } 

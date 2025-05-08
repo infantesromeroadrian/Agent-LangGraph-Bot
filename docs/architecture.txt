@@ -1,0 +1,124 @@
+# Arquitectura de Funcionalidades Avanzadas de LangGraph
+
+## Características Implementadas
+
+### 1. Flujos de Trabajo Paralelos
+Permite ejecutar múltiples agentes simultáneamente para acelerar el procesamiento.
+
+### 2. Grafos Cíclicos
+Crea bucles de retroalimentación donde los agentes pueden volver a etapas anteriores y refinar sus respuestas.
+
+### 3. Observabilidad Avanzada
+Integra con LangSmith para visualizar y depurar flujos complejos.
+
+## Diagrama de Arquitectura
+
+```
++---------------------------+      +--------------------------+
+|     Frontend (HTML/JS)    |----->|     FastAPI Backend      |
++---------------------------+      +--------------------------+
+             |                            |          |
+             v                            v          v
++---------------------------+    +----------------+  +------------------+
+| Server-Sent Events Stream |    | Estándar API  |  | API Avanzada     |
+| - Eventos en tiempo real  |    |               |  | (Nueva)          |
++---------------------------+    +----------------+  +------------------+
+                                         |                   |
+                                         v                   v
+                                 +----------------+  +------------------+
+                                 | Grafo Estándar |  | Grafo Avanzado   |
+                                 | LangGraph      |  | (Nuevo)          |
+                                 +----------------+  +------------------+
+                                                             |
+                                              +-----------------------------+
+                                              |                             |
+                                              v                             v                            v
+                                +------------------------+    +-------------------------+    +-------------------------+
+                                | Ejecución Paralela     |    | Bucles de Feedback     |    | Observabilidad LangSmith|
+                                | - Múltiples agentes    |    | - Refinamiento cíclico |    | - Trazas detalladas     |
+                                | - Combinación de       |    | - Mejora iterativa     |    | - Visualización de flujo|
+                                |   resultados           |    | - Control de ciclos    |    | - Análisis de ejecución |
+                                +------------------------+    +-------------------------+    +-------------------------+
+```
+
+## Estructura de Módulos (Modificada)
+
+```
+src/
+├── agents/                    # Sin cambios - Mantiene agentes existentes
+│   ├── base/
+│   ├── business/
+│   ├── core/
+│   ├── specialized/
+│   └── technical/
+├── controllers/
+│   ├── api_controller.py      # Modificado - Incluye nuevo router avanzado
+│   ├── document_controller.py # Sin cambios
+│   ├── query_controller.py    # Sin cambios
+│   └── advanced_query_controller.py # Nuevo - Endpoints para features avanzadas
+├── graph/
+│   ├── agent_graph.py         # Sin cambios - Grafo estándar
+│   └── advanced_graph.py      # Nuevo - Implementación de características avanzadas
+├── models/                    # Sin cambios - Modelos de datos
+├── services/
+│   ├── query_service.py       # Sin cambios - Servicio estándar
+│   ├── vector_store_service.py # Sin cambios - Gestión vectorial
+│   └── advanced_graph_service.py # Nuevo - Servicio para grafos avanzados
+└── utils/                     # Sin cambios - Utilidades
+```
+
+## Flujos de Datos
+
+### Flujo Paralelo
+
+1. Cliente envía solicitud a `/api/advanced/parallel`
+2. `advanced_query_controller` recibe la petición
+3. `AdvancedGraphService` crea ramas paralelas según configuración
+4. `AdvancedAgentGraph` ejecuta las ramas simultáneamente con asyncio
+5. Resultados de las ramas se combinan en un único estado
+6. Respuesta unificada se devuelve al cliente
+
+### Flujo Cíclico (Feedback Loop)
+
+1. Cliente envía solicitud a `/api/advanced/feedback-loop`
+2. `advanced_query_controller` recibe la petición
+3. `AdvancedGraphService` configura el bucle de retroalimentación
+4. Agentes ejecutan su procesamiento
+5. Nodo de decisión evalúa si continuar el bucle según condición
+6. Si la condición se cumple, se vuelve al nodo de inicio
+7. Si no, o se alcanza el límite de iteraciones, se finaliza
+8. Respuesta final se devuelve al cliente
+
+### Flujo Observabilidad
+
+1. Cliente envía solicitud a `/api/advanced/observable`
+2. `advanced_query_controller` recibe la petición
+3. `AdvancedGraphService` habilita observabilidad con LangSmith
+4. Grafo se ejecuta con tracer de LangSmith
+5. Cada nodo y transición se registra en LangSmith
+6. Cliente recibe respuesta con enlaces a dashboard
+7. Usuario puede explorar trazas detalladas en LangSmith
+
+## Relaciones entre Módulos
+
+[Controller] advanced_query_controller.py ---(Usa)---> [Service] advanced_graph_service.py
+[Service] advanced_graph_service.py ---(Usa)---> [Graph] advanced_graph.py
+[Graph] advanced_graph.py ---(Extiende)---> StateGraph de LangGraph
+[Graph] advanced_graph.py ---(Integra con)---> LangSmith
+
+## Consideraciones de Implementación
+
+1. **Concurrencia**: La ejecución paralela utiliza asyncio para máxima eficiencia
+2. **Límites de Ciclos**: Los bucles de retroalimentación tienen límites para evitar ciclos infinitos
+3. **Combinación de Resultados**: Estrategia configurable para combinar resultados de ramas paralelas
+4. **Observabilidad**: Integración opcional con LangSmith según configuración
+
+## Estado de Desarrollo
+
+- [x] Implementación completa de AdvancedAgentGraph
+- [x] Implementación completa de AdvancedGraphService
+- [x] Implementación completa de advanced_query_controller
+- [x] Integración con API principal completada
+- [ ] Pruebas unitarias pendientes
+- [ ] Documentación de API pendiente
+- [ ] Integración con frontend pendiente 

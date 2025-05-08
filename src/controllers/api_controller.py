@@ -4,6 +4,7 @@ from fastapi import APIRouter
 
 from src.controllers.query_controller import router as query_router
 from src.controllers.document_controller import router as document_router
+from src.controllers.advanced_query_controller import router as advanced_router
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -13,4 +14,5 @@ router = APIRouter(prefix="/api", tags=["API"])
 
 # Include sub-routers
 router.include_router(query_router, prefix="")
-router.include_router(document_router, prefix="") 
+router.include_router(document_router, prefix="")
+router.include_router(advanced_router, prefix="") 

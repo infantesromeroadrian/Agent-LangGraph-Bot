@@ -1,6 +1,7 @@
 """Data models for the company agent application."""
 from enum import Enum
-from typing import Dict, List, Optional, Union, Any
+from typing import Dict, List, Optional, Union, Any, Annotated
+import operator
 from pydantic import BaseModel, Field
 
 
@@ -91,11 +92,17 @@ class AgentResponse(BaseModel):
     thought_vector: Optional[List[float]] = None
 
 
+# Función para seleccionar el valor más reciente
+def last_value(a, b):
+    """Retorna el segundo valor, que sería el más reciente."""
+    return b
+
+
 class GraphState(BaseModel):
     """State maintained throughout the agent graph execution."""
-    messages: List[Message] = Field(default_factory=list)
-    current_agent: Optional[AgentRole] = None
-    human_query: Optional[str] = None
+    messages: Annotated[List[Message], operator.add] = Field(default_factory=list)
+    current_agent: Annotated[Optional[AgentRole], last_value] = None
+    human_query: Annotated[Optional[str], last_value] = None
     context: List[CompanyDocument] = Field(default_factory=list)
     tool_results: List[ToolResult] = Field(default_factory=list)
     agent_responses: Dict[str, AgentResponse] = Field(default_factory=dict)
