@@ -238,37 +238,37 @@ class DynamicAgentGraph:
             return False
     
     def add_preprocessor(self, preprocessor_function: Callable):
-        """Añade un preprocesador al grafo.
+        """Add a preprocessor function to the graph.
         
         Args:
-            preprocessor_function: Función de preprocesamiento
+            preprocessor_function: Function to preprocess the state
             
         Returns:
-            True si se añadió correctamente, False en caso contrario
+            True if added successfully, False otherwise
         """
         try:
-            self.compiled_graph = self.graph.compile(
-                checkpointer=None,
-                executor=None,
-                channel_factory=None,
-                interrupt_before=None,
-                interrupt_after=None,
-                state_transition_logger=None,
-                custom_executor=None,
-                # Añadimos el preprocesador
-                state_preprocessors=[preprocessor_function]
-            )
+            # Get the original graph
+            workflow = self.graph
+            
+            # Add the preprocessor
+            workflow.add_preprocessor(preprocessor_function)
+            
+            # Recompile the graph
+            self.compiled_graph = workflow.compile()
             return True
         except Exception as e:
-            print(f"Error al añadir preprocesador: {e}")
+            print(f"Error adding preprocessor: {e}")
             return False
-            
+    
     def get_compiled_graph(self):
-        """Devuelve el grafo compilado actual.
+        """Get the compiled graph.
         
         Returns:
-            El grafo compilado
+            Compiled graph
         """
+        if self.compiled_graph is None:
+            self._create_initial_graph()
+            
         return self.compiled_graph
 
 

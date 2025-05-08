@@ -91,18 +91,21 @@ class DocumentTool:
         """
         self.vector_store = vector_store_service
         
-    def add_document(self, input_data: Dict[str, Any]) -> ToolResult:
+    def add_document(self, input_data: Dict[str, Any] | AddDocumentInput) -> ToolResult:
         """Add a document to the vector store.
         
         Args:
-            input_data: Dictionary with document information
+            input_data: Dictionary with document information or AddDocumentInput object
             
         Returns:
             ToolResult with operation result
         """
         try:
-            # Parse input
-            validated_input = AddDocumentInput(**input_data)
+            # Parse input - handle both dict and AddDocumentInput
+            if isinstance(input_data, AddDocumentInput):
+                validated_input = input_data
+            else:
+                validated_input = AddDocumentInput(**input_data)
             
             # Create a unique ID for the document
             doc_id = str(uuid.uuid4())
@@ -117,8 +120,22 @@ class DocumentTool:
                 metadata=validated_input.metadata
             )
             
+            # Log document info for debugging
+            print(f"Adding document: ID={doc_id}, Title={document.title}, Type={document.document_type}")
+            
             # Add to vector store
-            self.vector_store.add_documents([document])
+            added_ids = self.vector_store.add_documents([document])
+            
+            if not added_ids:
+                print("Warning: Vector store returned empty ID list")
+                error_msg = "Document could not be added to vector store"
+                return ToolResult(
+                    tool_name="add_document",
+                    status=ToolResultType.ERROR,
+                    error_message=error_msg
+                )
+            
+            print(f"Document added successfully: {doc_id}")
             
             return ToolResult(
                 tool_name="add_document",
@@ -128,6 +145,10 @@ class DocumentTool:
             )
             
         except Exception as e:
+            import traceback
+            print(f"Error adding document: {e}")
+            print(traceback.format_exc())
+            
             return ToolResult(
                 tool_name="add_document",
                 status=ToolResultType.ERROR,

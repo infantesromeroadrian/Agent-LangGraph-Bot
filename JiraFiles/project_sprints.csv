@@ -1,0 +1,10 @@
+Sprint ID,Sprint Name,Start Date,End Date,Sprint Goal,Status,Issues Included
+SPRINT-1,Initial Setup,2024-01-10,2024-01-23,Set up project foundation and implement initial agent architecture,Completed,AGENT-001;AGENT-002;AGENT-003;AGENT-004;AGENT-005;AGENT-006;AGENT-007;AGENT-008;AGENT-009;AGENT-010
+SPRINT-2,Agent Development,2024-01-24,2024-02-06,Implement core agent roles and API framework,Completed,AGENT-011;AGENT-012;AGENT-013;AGENT-014;AGENT-015;AGENT-016;AGENT-017;AGENT-018;AGENT-019;AGENT-020
+SPRINT-3,Frontend & Document Management,2024-02-07,2024-02-20,Create user interface and document management capabilities,Completed,AGENT-021;AGENT-022;AGENT-023;AGENT-024;AGENT-025;AGENT-026;AGENT-027;AGENT-028;AGENT-029;AGENT-030
+SPRINT-4,System Enhancement,2024-02-21,2024-03-05,Implement advanced features and optimize agent workflow,Completed,AGENT-031;AGENT-032;AGENT-033;AGENT-034;AGENT-035;AGENT-036;AGENT-037;AGENT-038;AGENT-039
+SPRINT-5,Consultancy Specialization,2024-03-06,2024-03-19,Add specialized consulting agents and methodology knowledge,Completed,AGENT-040;AGENT-041;AGENT-042;AGENT-043;AGENT-044;AGENT-045;AGENT-046;AGENT-047;AGENT-048;AGENT-049
+SPRINT-6,Query Processing Improvements,2024-03-20,2024-04-02,Enhance query understanding and response generation,Completed,AGENT-050;AGENT-051;AGENT-052;AGENT-053;AGENT-054;AGENT-055;AGENT-056;AGENT-057;AGENT-058;AGENT-059
+SPRINT-7,Testing & Documentation,2024-04-03,2024-04-16,Create comprehensive tests and documentation,Completed,AGENT-060;AGENT-061;AGENT-062;AGENT-063;AGENT-064;AGENT-065;AGENT-066;AGENT-067;AGENT-068;AGENT-069
+SPRINT-8,Production Preparation,2024-04-17,2024-04-30,Final optimizations and production preparation,Completed,AGENT-070;AGENT-071;AGENT-072;AGENT-073;AGENT-074;AGENT-075;AGENT-076;AGENT-077;AGENT-078;AGENT-079
+SPRINT-9,Deployment & Handover,2024-05-01,2024-05-06,Deploy to production and complete project handover,Completed,AGENT-080;AGENT-081;AGENT-082;AGENT-083 

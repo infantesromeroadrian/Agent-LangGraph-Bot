@@ -1,0 +1,21 @@
+Issue Key,Summary,Description,Date Reported,Reporter,Assignee,Priority,Severity,Status,Resolution,Related Task
+BUG-001,Document Upload Error,PDF documents with more than 50 pages cause memory overflow,2024-02-14,qa_engineer,data_engineer,High,Major,Resolved,Fixed,AGENT-026
+BUG-002,Chrome Browser Compatibility,Frontend interface not rendering correctly in Chrome,2024-02-08,frontend_dev,frontend_dev,Medium,Minor,Resolved,Fixed,AGENT-022
+BUG-003,Language Detection Failure,Language detection fails for very short queries,2024-01-23,qa_engineer,ai_engineer,Medium,Minor,Resolved,Fixed,AGENT-009
+BUG-004,ChromaDB Connection Issue,Intermittent connection failures to ChromaDB in Docker environment,2024-01-16,data_engineer,dev_ops,High,Major,Resolved,Fixed,AGENT-004
+BUG-005,Response Formatting Error,HTML tags appearing in final responses,2024-01-31,qa_engineer,ai_engineer,Low,Trivial,Resolved,Fixed,AGENT-016
+BUG-006,AddableValuesDict Error,Type error when processing dictionary responses from agents,2024-03-05,ai_engineer,ai_engineer,High,Critical,Resolved,Fixed,AGENT-040
+BUG-007,Streaming Response Timeout,Streaming responses timing out after 30 seconds,2024-03-02,backend_dev,backend_dev,Medium,Major,Resolved,Fixed,AGENT-037
+BUG-008,CSV Import Encoding Error,Non-UTF8 encoded CSV files cause import failure,2024-02-16,data_engineer,data_engineer,Medium,Minor,Resolved,Fixed,AGENT-027
+BUG-009,Context Window Overflow,Large document context causing context window overflow in LLM,2024-02-13,ai_engineer,ai_engineer,High,Major,Resolved,Fixed,AGENT-024
+BUG-010,Memory Leak in Document Processing,Memory utilization continuously increasing during PDF processing,2024-03-27,dev_ops,backend_dev,High,Critical,Resolved,Fixed,AGENT-057
+BUG-011,CORS Error on API Requests,Cross-Origin Resource Sharing error from certain domains,2024-02-28,frontend_dev,backend_dev,Medium,Major,Resolved,Fixed,AGENT-035
+BUG-012,Incorrect Agent Selection,Agent selection logic sending queries to wrong specialized agents,2024-03-20,qa_engineer,ai_engineer,High,Major,Resolved,Fixed,AGENT-049
+BUG-013,Docker Network Configuration,Container communication failing in certain network configurations,2024-04-03,dev_ops,dev_ops,Medium,Major,Resolved,Fixed,AGENT-061
+BUG-014,Concurrent Request Handling,System crashes under concurrent user requests,2024-04-01,qa_engineer,backend_dev,High,Critical,Resolved,Fixed,AGENT-058
+BUG-015,Vector Search Performance,Vector search becoming very slow with over 1000 documents,2024-03-26,data_engineer,data_engineer,Medium,Major,Resolved,Fixed,AGENT-055
+BUG-016,Credential Leakage in Logs,API keys accidentally being logged in debug mode,2024-04-19,security_engineer,security_engineer,High,Critical,Resolved,Fixed,AGENT-072
+BUG-017,Frontend CSS Rendering Issue,Interface elements misaligned on mobile devices,2024-04-25,qa_engineer,frontend_dev,Low,Minor,Resolved,Fixed,AGENT-077
+BUG-018,Agent Response Truncation,Long agent responses being truncated in the UI,2024-04-28,qa_engineer,ai_engineer,Medium,Minor,Resolved,Fixed,AGENT-078
+BUG-019,Authentication Timeout,API authentication timing out after 1 hour of activity,2024-04-17,qa_engineer,backend_dev,Medium,Major,Resolved,Fixed,AGENT-070
+BUG-020,Document Deletion Failure,Attempting to delete non-existent documents causes application error,2024-04-22,qa_engineer,data_engineer,Low,Minor,Resolved,Fixed,AGENT-073 

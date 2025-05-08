@@ -34,35 +34,53 @@ class LLMService:
             api_key=config.llm.openai_api_key,
         )
     
-    def create_chain(self, prompt_template: str, output_parser=None):
+    def create_chain(self, prompt_template: str, output_parser=None, streaming=False):
         """Create a simple chain with the given prompt template.
         
         Args:
             prompt_template: The template string for the prompt
             output_parser: Optional parser for the output (defaults to string)
+            streaming: Whether to enable streaming mode
             
         Returns:
             A runnable chain
         """
         prompt = PromptTemplate.from_template(prompt_template)
         
+        # Configure model for streaming if requested
+        if streaming:
+            # Use a copy of the model with streaming enabled
+            streaming_model = self.chat_model.with_config({"streaming": True})
+            model = streaming_model
+        else:
+            model = self.chat_model
+            
         if output_parser is None:
             output_parser = StrOutputParser()
             
-        return prompt | self.chat_model | output_parser
+        return prompt | model | output_parser
     
-    def create_rag_chain(self, prompt_template: str, retriever, output_parser=None):
+    def create_rag_chain(self, prompt_template: str, retriever, output_parser=None, streaming=False):
         """Create a RAG (Retrieval Augmented Generation) chain.
         
         Args:
             prompt_template: The template string for the prompt
             retriever: The retriever component to use
             output_parser: Optional parser for the output (defaults to string)
+            streaming: Whether to enable streaming mode
             
         Returns:
             A runnable RAG chain
         """
         prompt = PromptTemplate.from_template(prompt_template)
+        
+        # Configure model for streaming if requested
+        if streaming:
+            # Use a copy of the model with streaming enabled
+            streaming_model = self.chat_model.with_config({"streaming": True})
+            model = streaming_model
+        else:
+            model = self.chat_model
         
         if output_parser is None:
             output_parser = StrOutputParser()
@@ -71,5 +89,5 @@ class LLMService:
             {"context": retriever, "question": RunnablePassthrough()}
         )
         
-        chain = setup_and_retrieval | prompt | self.chat_model | output_parser
+        chain = setup_and_retrieval | prompt | model | output_parser
         return chain 

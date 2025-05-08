@@ -4,6 +4,8 @@ import logging
 from langchain_core.language_models import BaseChatModel
 from langchain_openai import OpenAIEmbeddings
 import numpy as np
+import os
+import json
 
 from src.models.class_models import GraphState, AgentRole
 
@@ -21,22 +23,19 @@ class GraphManagerUtil:
         """
         # Initialize embeddings model for thought vectors if not provided
         self.embeddings = embeddings_model or OpenAIEmbeddings()
-        # Add a field to store the current query
-        self.current_query = None
+        self.thought_embeddings = {}
+        self.current_query = ""
     
     def initialize(self, query: str):
         """Initialize the graph manager for a new query.
         
         Args:
-            query: The user query to process
+            query: User query
         """
-        # Store the current query
         self.current_query = query
-        logger.info(f"Initialized graph manager for query: {query}")
+        self.thought_embeddings = {}
+        logger.info(f"GraphManager initialized with query: {query}")
         
-        # Reset any per-query state here if needed in the future
-        # For now, this is a simple initialization
-    
     def modify_state_for_dynamic_execution(self, state: GraphState) -> GraphState:
         """Process state to handle dynamic graph execution.
         
@@ -111,7 +110,7 @@ class GraphManagerUtil:
         return float(similarity)
     
     def should_skip_node(self, state: GraphState, node_name: str) -> bool:
-        """Check if a node should be skipped based on graph state.
+        """Check if a node should be skipped.
         
         Args:
             state: Current graph state
@@ -120,75 +119,76 @@ class GraphManagerUtil:
         Returns:
             True if the node should be skipped, False otherwise
         """
-        if not state.disabled_nodes:
-            return False
+        # Skip if the node is in the disabled_nodes list
+        if node_name in state.disabled_nodes:
+            return True
             
-        return node_name in state.disabled_nodes
+        # Skip if active_nodes is specified and this node is not in it
+        if state.active_nodes and node_name not in state.active_nodes:
+            return True
+            
+        return False
     
-    def add_thought_to_shared_memory(self, state: GraphState, agent_role: AgentRole, 
-                                    thought: str, key: Optional[str] = None) -> GraphState:
-        """Add a thought vector to the shared memory.
+    def add_thought_to_shared_memory(self, state: GraphState, agent_role: AgentRole, thought: str):
+        """Add a thought vector to shared memory.
         
         Args:
             state: Current graph state
-            agent_role: Role of the agent adding the thought
-            thought: Textual thought
-            key: Optional key for the thought (defaults to agent_role)
-            
-        Returns:
-            Updated graph state
+            agent_role: Role of the agent generating the thought
+            thought: Thought content
         """
-        # Create vector from thought
-        vector = self.create_thought_vector(thought)
-        
-        # Use agent role as key if not specified
-        memory_key = key or str(agent_role)
-        
-        # Store in thought vectors
-        state.thought_vectors[memory_key] = vector
-        
-        # Also store the raw thought in shared memory for reference
-        if "thoughts" not in state.shared_memory:
-            state.shared_memory["thoughts"] = {}
+        if not hasattr(state, 'thought_vectors') or state.thought_vectors is None:
+            state.thought_vectors = {}
             
-        state.shared_memory["thoughts"][memory_key] = thought
+        # For now, just store the raw thought (no actual vector)
+        role_str = agent_role.value if isinstance(agent_role, AgentRole) else str(agent_role)
         
-        return state
-    
-    def find_similar_thoughts(self, state: GraphState, query_thought: str, 
-                             threshold: float = 0.7, max_results: int = 3) -> List[Dict[str, Any]]:
-        """Find similar thoughts in the shared memory.
+        if role_str not in state.thought_vectors:
+            state.thought_vectors[role_str] = []
+            
+        # Store the thought
+        state.thought_vectors[role_str].append(thought)
+        
+        # Cache for local use
+        self.thought_embeddings[role_str] = thought
+        
+    def find_similar_thoughts(self, state: GraphState, query: str, threshold: float = 0.7, max_results: int = 3) -> List[Dict[str, Any]]:
+        """Find thoughts similar to the query.
         
         Args:
             state: Current graph state
-            query_thought: Thought to compare against
-            threshold: Similarity threshold (0-1)
+            query: Query to find similar thoughts
+            threshold: Similarity threshold
             max_results: Maximum number of results to return
             
         Returns:
-            List of similar thoughts with metadata
+            List of similar thoughts with similarity scores
         """
-        if not state.thought_vectors:
-            return []
-            
-        # Create vector from query thought
-        query_vector = self.create_thought_vector(query_thought)
+        results = []
         
-        # Calculate similarity with all stored vectors
-        similarities = []
-        for key, vector in state.thought_vectors.items():
-            similarity = self.calculate_thought_similarity(query_vector, vector)
-            
-            if similarity >= threshold:
-                # Get the original thought text if available
-                thought_text = state.shared_memory.get("thoughts", {}).get(key, "Unknown thought")
+        # Without actual embeddings, just do basic keyword matching
+        query_lower = query.lower()
+        query_words = set(query_lower.split())
+        
+        for role, thoughts in state.thought_vectors.items():
+            for thought in thoughts:
+                thought_lower = thought.lower()
                 
-                similarities.append({
-                    "key": key,
-                    "similarity": similarity,
-                    "thought": thought_text
-                })
+                # Very simple similarity - count common words
+                thought_words = set(thought_lower.split())
+                common_words = query_words.intersection(thought_words)
+                
+                if common_words:
+                    # Calculate a simple similarity score
+                    similarity = len(common_words) / (len(query_words) + len(thought_words)) * 2
+                    
+                    if similarity >= threshold:
+                        results.append({
+                            "role": role,
+                            "thought": thought,
+                            "similarity": similarity
+                        })
         
-        # Sort by similarity (descending) and limit results
-        similarities.sort(key=lambda x: x["similarity"], reverse=True)
-        return similarities[:max_results] 
+        # Sort by similarity and limit results
+        results.sort(key=lambda x: x["similarity"], reverse=True)
+        return results[:max_results] 

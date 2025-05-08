@@ -1,0 +1,13 @@
+Epic Key,Epic Name,Description,Start Date,End Date,Status,Related Issues
+EPIC-001,Project Initialization,Initial setup and configuration of the project environment,2024-01-10,2024-01-19,Done,AGENT-001;AGENT-002;AGENT-003;AGENT-007;AGENT-008
+EPIC-002,Core Services Development,Implementation of fundamental services for the application,2024-01-15,2024-01-23,Done,AGENT-004;AGENT-006;AGENT-017;AGENT-028;AGENT-031
+EPIC-003,Agent System Development,Creation of the base multi-agent system with specialized agents,2024-01-16,2024-02-09,Done,AGENT-005;AGENT-009;AGENT-010;AGENT-011;AGENT-012;AGENT-013;AGENT-014;AGENT-015;AGENT-016;AGENT-023
+EPIC-004,API & Frontend Development,Implementation of API endpoints and user interface,2024-02-02,2024-02-08,Done,AGENT-018;AGENT-019;AGENT-020;AGENT-021;AGENT-022
+EPIC-005,Document Management,Implementation of document processing and vector store integration,2024-02-12,2024-02-15,Done,AGENT-024;AGENT-025;AGENT-026;AGENT-027
+EPIC-006,System Enhancement,Advanced features and optimizations for the agent system,2024-02-19,2024-03-06,Done,AGENT-029;AGENT-030;AGENT-032;AGENT-033;AGENT-034;AGENT-035;AGENT-036;AGENT-037;AGENT-038;AGENT-039;AGENT-040
+EPIC-007,Consulting Specialization,Implementation of specialized consulting agents and knowledge,2024-03-07,2024-03-20,Done,AGENT-041;AGENT-042;AGENT-043;AGENT-044;AGENT-045;AGENT-046;AGENT-047;AGENT-048;AGENT-049;AGENT-050
+EPIC-008,Query Processing Enhancement,Improvements to query understanding and processing,2024-03-21,2024-03-29,Done,AGENT-051;AGENT-052;AGENT-053;AGENT-054;AGENT-055;AGENT-056;AGENT-057
+EPIC-009,System Optimization,Performance and security improvements,2024-04-01,2024-04-04,Done,AGENT-058;AGENT-059;AGENT-060;AGENT-061
+EPIC-010,Documentation & Testing,System documentation and comprehensive testing,2024-04-05,2024-04-16,Done,AGENT-062;AGENT-063;AGENT-064;AGENT-065;AGENT-066;AGENT-067;AGENT-068;AGENT-069
+EPIC-011,Production Preparation,Final optimizations and deployment preparation,2024-04-17,2024-04-30,Done,AGENT-070;AGENT-071;AGENT-072;AGENT-073;AGENT-074;AGENT-075;AGENT-076;AGENT-077;AGENT-078;AGENT-079
+EPIC-012,Deployment & Handover,Production deployment and project completion,2024-05-01,2024-05-06,Done,AGENT-080;AGENT-081;AGENT-082;AGENT-083 

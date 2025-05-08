@@ -1,0 +1,84 @@
+Issue Key,Summary,Description,Date,User,Time Spent,Story Points,Status
+AGENT-001,Initial Project Setup,Setup project structure and environment configuration with FastAPI framework.,2024-01-10,dev_admin,4h,3,Done
+AGENT-002,Configure Docker Environment,Create Dockerfile and docker-compose.yml for containerized deployment.,2024-01-11,dev_ops,3h,2,Done
+AGENT-003,Implement Core Configuration Service,Create configuration service to handle environment variables and system settings.,2024-01-12,dev_admin,2h,1,Done
+AGENT-004,Setup Vector Store Service,Implement ChromaDB integration for document storage and retrieval.,2024-01-15,data_engineer,5h,5,Done
+AGENT-005,Create Base Agent Models,Define base agent models and interfaces for the multi-agent system.,2024-01-16,ai_engineer,4h,3,Done
+AGENT-006,Implement Basic LLM Service,Create service for LLM interactions with prompt templating support.,2024-01-17,ai_engineer,6h,5,Done
+AGENT-007,Implement GraphState Class Model,Create data model for managing state across the agent workflow.,2024-01-18,ai_engineer,3h,2,Done
+AGENT-008,Design Agent Roles and Interfaces,Define specialized agent roles and communication interfaces.,2024-01-19,system_architect,4h,3,Done
+AGENT-009,Create Language Detection Agent,Implement agent to detect and handle multiple languages in user queries.,2024-01-22,ai_engineer,5h,3,Done
+AGENT-010,Implement Solution Architect Agent,Create specialized agent for technical solution design and architecture recommendations.,2024-01-23,ai_engineer,8h,8,Done
+AGENT-011,Develop Technical Research Agent,Implement agent for technical research and information gathering.,2024-01-24,ai_engineer,8h,8,Done
+AGENT-012,Implement Project Management Agent,Create agent specializing in project management methodologies and best practices.,2024-01-25,ai_engineer,6h,5,Done
+AGENT-013,Develop Code Review Agent,Implement agent for code review and best practice recommendations.,2024-01-26,ai_engineer,7h,5,Done
+AGENT-014,Create Market Analysis Agent,Implement agent for market research and competitive analysis.,2024-01-29,ai_engineer,6h,5,Done
+AGENT-015,Implement Data Analysis Agent,Create agent specialized in data analysis and visualization recommendations.,2024-01-30,ai_engineer,7h,5,Done
+AGENT-016,Develop Client Communication Agent,Implement final response generation agent with appropriate tone and format.,2024-01-31,ai_engineer,8h,8,Done
+AGENT-017,Setup LangGraph Workflow Manager,Create utility to manage and configure the LangGraph execution workflow.,2024-02-01,ai_engineer,6h,5,Done
+AGENT-018,Implement Core API Controller,Create FastAPI controller for handling query requests.,2024-02-02,backend_dev,5h,3,Done
+AGENT-019,Add Document Management API,Implement API endpoints for document management (add/delete/search).,2024-02-05,backend_dev,6h,5,Done
+AGENT-020,Implement Health Check Endpoint,Add system health check endpoint for monitoring.,2024-02-06,backend_dev,1h,1,Done
+AGENT-021,Create HTML Frontend Template,Design and implement basic HTML interface for the bot.,2024-02-07,frontend_dev,4h,3,Done
+AGENT-022,Add Static CSS and JavaScript,Implement static assets for the frontend interface.,2024-02-08,frontend_dev,3h,2,Done
+AGENT-023,Implement Agent Prompt Templates,Create standardized prompt templates for each agent role.,2024-02-09,ai_engineer,4h,3,Done
+AGENT-024,Add Context Retrieval System,Implement intelligent context retrieval from vector store.,2024-02-12,ai_engineer,5h,5,Done
+AGENT-025,Create Sample Data Loading Utility,Develop utility to create and load sample documents into the vector store.,2024-02-13,data_engineer,4h,3,Done
+AGENT-026,Implement PDF Document Extraction,Add support for extracting and processing PDF documents.,2024-02-14,data_engineer,6h,5,Done
+AGENT-027,Add CSV Document Extraction,Implement support for processing CSV documents and adding to vector store.,2024-02-15,data_engineer,4h,3,Done
+AGENT-028,Integrate LangSmith Tracing,Add integration with LangSmith for observability and debugging.,2024-02-16,ai_engineer,3h,2,Done
+AGENT-029,Implement Query Router Logic,Create conditional routing logic to optimize agent workflow.,2024-02-19,ai_engineer,5h,5,Done
+AGENT-030,Add Conversation Memory,Implement conversation memory to maintain context across interactions.,2024-02-20,ai_engineer,4h,3,Done
+AGENT-031,Create Utility for External API Calls,Implement service for safely making external API calls when needed.,2024-02-21,backend_dev,3h,2,Done
+AGENT-032,Add Dynamic Agent Selection,Implement system to dynamically select appropriate agents based on query.,2024-02-22,ai_engineer,6h,5,Done
+AGENT-033,Fix Document Upload Error Handling,Improve error handling in document upload functionality.,2024-02-23,backend_dev,2h,1,Done
+AGENT-034,Add File Type Validation,Implement validation for supported file types in document upload.,2024-02-26,backend_dev,2h,1,Done
+AGENT-035,Create CORS Middleware,Add CORS middleware for API security.,2024-02-27,backend_dev,1h,1,Done
+AGENT-036,Implement Dynamic Graph Modification,Develop capability to modify the agent graph structure at runtime.,2024-02-28,ai_engineer,8h,8,Done
+AGENT-037,Add Streaming Response Support,Implement streaming of responses as they are generated.,2024-03-01,ai_engineer,7h,8,Done
+AGENT-038,Create /query/stream Endpoint,Add dedicated API endpoint for streaming responses.,2024-03-04,backend_dev,4h,3,Done
+AGENT-039,Implement Advanced Shared Memory,Create vector-based shared memory system for agent collaboration.,2024-03-05,ai_engineer,8h,8,Done
+AGENT-040,Fix AddableValuesDict Error,Resolve error in process_user_query function for proper LangGraph response handling.,2024-03-06,ai_engineer,3h,2,Done
+AGENT-041,Design Digital Transformation Agent,Create specialized agent for digital transformation consulting.,2024-03-07,ai_engineer,6h,5,Done
+AGENT-042,Implement Cloud Architecture Agent,Develop agent specializing in cloud architecture and solutions.,2024-03-08,ai_engineer,7h,5,Done
+AGENT-043,Create Cyber Security Agent,Implement agent for cybersecurity recommendations and best practices.,2024-03-11,ai_engineer,7h,5,Done
+AGENT-044,Develop Agile Methodologies Agent,Create agent specializing in Agile and Scrum methodologies.,2024-03-12,ai_engineer,6h,5,Done
+AGENT-045,Implement Systems Integration Agent,Develop agent for systems integration consulting and recommendations.,2024-03-13,ai_engineer,7h,5,Done
+AGENT-046,Add ITIL Knowledge Integration,Integrate ITIL methodology knowledge into the vector store.,2024-03-14,data_engineer,4h,3,Done
+AGENT-047,Add COBIT Framework Integration,Integrate COBIT governance framework knowledge into the vector store.,2024-03-15,data_engineer,4h,3,Done
+AGENT-048,Integrate TOGAF Architecture Framework,Add TOGAF enterprise architecture framework knowledge.,2024-03-18,data_engineer,4h,3,Done
+AGENT-049,Update Agent Selection Conditionals,Implement conditional node selection for new specialized agents.,2024-03-19,ai_engineer,5h,3,Done
+AGENT-050,Enhance Prompt Templates for Consultancy,Update prompt templates with consultancy-specific instructions.,2024-03-20,ai_engineer,3h,2,Done
+AGENT-051,Add Simple Query Detection,Implement detection of simple conversational queries to optimize response.,2024-03-21,ai_engineer,3h,2,Done
+AGENT-052,Create Entity Extraction Utility,Develop utility to extract named entities from user queries.,2024-03-22,ai_engineer,4h,3,Done
+AGENT-053,Implement Intent Recognition,Add intent recognition to better understand user queries.,2024-03-25,ai_engineer,5h,5,Done
+AGENT-054,Fix Streaming Response Format,Resolve formatting issues in streaming response handling.,2024-03-26,ai_engineer,3h,2,Done
+AGENT-055,Optimize Vector Search Parameters,Fine-tune vector search parameters for better document retrieval.,2024-03-27,data_engineer,3h,2,Done
+AGENT-056,Update Frontend for Streaming Support,Modify frontend to handle streaming responses.,2024-03-28,frontend_dev,4h,3,Done
+AGENT-057,Fix Memory Leak in Document Processing,Resolve memory usage issue when processing large documents.,2024-03-29,backend_dev,5h,3,Done
+AGENT-058,Implement Advanced Error Handling,Add comprehensive error handling throughout the system.,2024-04-01,backend_dev,4h,3,Done
+AGENT-059,Add Response Logging System,Implement system for logging agent responses and user interactions.,2024-04-02,backend_dev,3h,2,Done
+AGENT-060,Improve Language Detection Accuracy,Enhance language detection agent for better accuracy.,2024-04-03,ai_engineer,4h,3,Done
+AGENT-061,Update Docker Networking Configuration,Optimize Docker networking for better container communication.,2024-04-04,dev_ops,2h,1,Done
+AGENT-062,Add System Documentation,Create comprehensive system documentation.,2024-04-05,tech_writer,6h,3,Done
+AGENT-063,Create Developer Guide,Write developer guide for system extension and maintenance.,2024-04-08,tech_writer,5h,3,Done
+AGENT-064,Develop API Documentation,Create detailed API documentation.,2024-04-09,tech_writer,4h,2,Done
+AGENT-065,Implement Code Comments,Add comprehensive code comments throughout the codebase.,2024-04-10,ai_engineer,5h,3,Done
+AGENT-066,Create API Tests,Develop tests for API endpoints.,2024-04-11,qa_engineer,4h,3,Done
+AGENT-067,Implement Unit Tests for Agents,Create unit tests for agent functionality.,2024-04-12,qa_engineer,6h,5,Done
+AGENT-068,Add Integration Tests,Develop integration tests for system components.,2024-04-15,qa_engineer,5h,5,Done
+AGENT-069,Implement End-to-End Tests,Create end-to-end system tests.,2024-04-16,qa_engineer,5h,5,Done
+AGENT-070,Performance Optimization,Optimize system performance and response times.,2024-04-17,ai_engineer,6h,5,Done
+AGENT-071,Security Audit,Conduct security audit of the entire system.,2024-04-18,security_engineer,8h,5,Done
+AGENT-072,Fix Security Vulnerabilities,Address security issues identified in audit.,2024-04-19,security_engineer,5h,3,Done
+AGENT-073,Update Vector Store Schema,Improve vector store schema for better document management.,2024-04-22,data_engineer,3h,2,Done
+AGENT-074,Implement Automated Deployment,Create automated deployment pipeline.,2024-04-23,dev_ops,6h,5,Done
+AGENT-075,Add Monitoring System,Implement system monitoring and alerting.,2024-04-24,dev_ops,5h,3,Done
+AGENT-076,Create User Guide,Develop comprehensive user guide.,2024-04-25,tech_writer,5h,3,Done
+AGENT-077,Fix Frontend CSS Issues,Resolve styling issues in frontend interface.,2024-04-26,frontend_dev,2h,1,Done
+AGENT-078,Improve Response Formatting,Enhance formatting of agent responses for better readability.,2024-04-29,ai_engineer,3h,2,Done
+AGENT-079,Create Demo Video,Produce demonstration video of system functionality.,2024-04-30,tech_writer,4h,2,Done
+AGENT-080,Production Deployment,Deploy system to production environment.,2024-05-01,dev_ops,4h,3,Done
+AGENT-081,User Acceptance Testing,Conduct user acceptance testing with stakeholders.,2024-05-02,qa_engineer,6h,3,Done
+AGENT-082,Final Documentation Update,Update all documentation with final changes.,2024-05-03,tech_writer,3h,2,Done
+AGENT-083,Project Handover,Complete project handover to operations team.,2024-05-06,project_manager,4h,2,Done 
