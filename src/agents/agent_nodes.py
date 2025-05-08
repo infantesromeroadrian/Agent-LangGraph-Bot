@@ -5,6 +5,7 @@ from langchain_core.messages import HumanMessage
 from src.models.class_models import GraphState, AgentRole, MessageType, CompanyDocument
 from src.services.llm_service import LLMService
 from src.services.vector_store_service import VectorStoreService
+from src.utils.graph_utils import GraphManagerUtil
 from src.agents.agent_utils import (
     create_agent_prompt,
     create_message,
@@ -19,6 +20,7 @@ class AgentNodes:
         """Initialize agent nodes with services."""
         self.llm_service = LLMService()
         self.vector_store = VectorStoreService()
+        self.graph_manager = GraphManagerUtil()
         
     def retrieve_context(self, state: GraphState) -> GraphState:
         """Retrieve relevant context for the query.
@@ -114,6 +116,10 @@ class AgentNodes:
         # Set current agent
         state.current_agent = AgentRole.SOLUTION_ARCHITECT
         
+        # Skip if node is disabled
+        if self.graph_manager.should_skip_node(state, AgentRole.SOLUTION_ARCHITECT.value):
+            return state
+        
         # Create prompt for solution architect
         prompt = create_agent_prompt(
             AgentRole.SOLUTION_ARCHITECT,
@@ -121,6 +127,19 @@ class AgentNodes:
             state.messages,
             state.context
         )
+        
+        # Add relevant thoughts from shared memory if available
+        if state.thought_vectors and state.human_query:
+            similar_thoughts = self.graph_manager.find_similar_thoughts(
+                state, 
+                state.human_query, 
+                threshold=0.6
+            )
+            
+            if similar_thoughts:
+                prompt += "\n\nRelevant thoughts from other agents:\n"
+                for thought in similar_thoughts:
+                    prompt += f"- {thought['thought']} (similarity: {thought['similarity']:.2f})\n"
         
         # Get response from LLM
         chain = self.llm_service.create_chain(
@@ -133,6 +152,13 @@ class AgentNodes:
             content=response,
             agent_role=AgentRole.SOLUTION_ARCHITECT,
             sources=[doc.id for doc in state.context],
+        )
+        
+        # Add thought vector to shared memory
+        self.graph_manager.add_thought_to_shared_memory(
+            state,
+            AgentRole.SOLUTION_ARCHITECT,
+            response
         )
         
         # Update state
@@ -151,6 +177,10 @@ class AgentNodes:
         """
         # Set current agent
         state.current_agent = AgentRole.TECHNICAL_RESEARCH
+        
+        # Skip if node is disabled
+        if self.graph_manager.should_skip_node(state, AgentRole.TECHNICAL_RESEARCH.value):
+            return state
         
         # Check if we need external knowledge
         external_docs = self._process_external_knowledge(state.human_query)
@@ -175,6 +205,19 @@ class AgentNodes:
             state.context
         )
         
+        # Add relevant thoughts from shared memory if available
+        if state.thought_vectors:
+            similar_thoughts = self.graph_manager.find_similar_thoughts(
+                state, 
+                state.human_query or "", 
+                threshold=0.6
+            )
+            
+            if similar_thoughts:
+                prompt += "\n\nRelevant thoughts from other agents:\n"
+                for thought in similar_thoughts:
+                    prompt += f"- {thought['thought']} (similarity: {thought['similarity']:.2f})\n"
+        
         # Get response from LLM
         chain = self.llm_service.create_chain(
             "{input}",
@@ -186,6 +229,13 @@ class AgentNodes:
             content=response,
             agent_role=AgentRole.TECHNICAL_RESEARCH,
             sources=[doc.id for doc in state.context],
+        )
+        
+        # Add thought vector to shared memory
+        self.graph_manager.add_thought_to_shared_memory(
+            state,
+            AgentRole.TECHNICAL_RESEARCH,
+            response
         )
         
         # Update state
@@ -527,75 +577,43 @@ class AgentNodes:
         return state
     
     def client_communication_agent(self, state: GraphState) -> GraphState:
-        """Client Communication agent for crafting clear, professional responses.
+        """Client Communication agent to format the final response.
         
         Args:
             state: Current graph state
             
         Returns:
-            Updated graph state with client communication response
+            Updated graph state with final response
         """
         # Set current agent
         state.current_agent = AgentRole.CLIENT_COMMUNICATION
         
-        # Check if this is a simple conversational query
-        if not state.context and self._is_simple_conversational_query(state.human_query):
-            # Generate a simple conversational response directly
-            simple_response = self._generate_conversational_response(state.human_query, state.messages)
-            
-            # Create agent response
-            agent_response = create_agent_response(
-                content=simple_response,
-                agent_role=AgentRole.CLIENT_COMMUNICATION,
-                sources=[],  # No sources for conversational responses
-            )
-            
-            # Set final response in state
-            state.final_response = simple_response
-            
-            # Add AI message to conversation history
-            ai_msg = create_message(
-                simple_response,
-                MessageType.AI,
-                "company_bot"
-            )
-            state.messages.append(ai_msg)
-            
-            # Update state
-            state.agent_responses[AgentRole.CLIENT_COMMUNICATION] = agent_response
-            
-            return state
-        
-        # For regular queries, continue with normal processing
-        # Prepare context from other agent responses for comprehensive communication
-        from src.models.class_models import CompanyDocument
-        context = state.context.copy()
-        
-        # Add responses from other agents as context
-        for role, response in state.agent_responses.items():
-            if role != AgentRole.CLIENT_COMMUNICATION:  # Avoid circular reference
-                agent_doc = CompanyDocument(
-                    id=f"{role.value}_analysis",
-                    title=f"{role.value.capitalize()} Agent Analysis",
-                    content=response.content,
-                    document_type="agent_response",
-                    source=f"{role.value}_agent"
-                )
-                context.append(agent_doc)
+        # Check if streaming is enabled
+        if state.is_streaming:
+            return self._streaming_client_communication(state)
         
         # Create prompt for client communication
         prompt = create_agent_prompt(
             AgentRole.CLIENT_COMMUNICATION,
             state.human_query or "",
             state.messages,
-            context
+            state.context
         )
+        
+        # Include all other agent responses in the prompt
+        agent_responses_text = "Previous Agent Insights:\n"
+        for role, response in state.agent_responses.items():
+            if role != AgentRole.CLIENT_COMMUNICATION:
+                agent_responses_text += f"\n--- {role} Agent ---\n{response.content}\n"
+        
+        # Integrate insights into the prompt
+        full_prompt = f"{prompt}\n\n{agent_responses_text}\n\nPlease formulate a comprehensive final response to the user's query."
         
         # Get response from LLM
         chain = self.llm_service.create_chain(
             "{input}",
         )
-        response = chain.invoke({"input": prompt})
+        response = chain.invoke({"input": full_prompt})
         
         # Create agent response
         agent_response = create_agent_response(
@@ -604,53 +622,113 @@ class AgentNodes:
             sources=[doc.id for doc in state.context],
         )
         
-        # Set final response in state
-        state.final_response = response
-        
-        # Add AI message to conversation history
-        ai_msg = create_message(
-            response,
-            MessageType.AI,
-            "company_bot"
-        )
-        state.messages.append(ai_msg)
-        
         # Update state
         state.agent_responses[AgentRole.CLIENT_COMMUNICATION] = agent_response
+        state.final_response = response
         
         return state
-        
-    def _generate_conversational_response(self, query: str, conversation_history: List[Any]) -> str:
-        """Generate a simple conversational response.
+    
+    def _streaming_client_communication(self, state: GraphState) -> GraphState:
+        """Versión streaming del agente de comunicación con el cliente.
         
         Args:
-            query: User query
-            conversation_history: Conversation history
+            state: Current graph state
             
         Returns:
-            Simple conversational response
+            Updated graph state with partial responses
         """
-        # Simple templates for different types of conversational queries
-        query_lower = query.lower().strip()
+        # Create prompt for client communication 
+        prompt = create_agent_prompt(
+            AgentRole.CLIENT_COMMUNICATION,
+            state.human_query or "",
+            state.messages,
+            state.context
+        )
         
-        # Process greetings
-        if any(greeting in query_lower for greeting in ["hello", "hi", "hey", "hola", "buenos", "buenas"]):
-            return "¡Hola! Soy el asistente de consultoría tecnológica AI. ¿En qué puedo ayudarte hoy?"
+        # Include all other agent responses in the prompt
+        agent_responses_text = "Previous Agent Insights:\n"
+        for role, response in state.agent_responses.items():
+            if role != AgentRole.CLIENT_COMMUNICATION:
+                agent_responses_text += f"\n--- {role} Agent ---\n{response.content}\n"
+        
+        # Integrate insights into the prompt
+        full_prompt = f"{prompt}\n\n{agent_responses_text}\n\nPlease formulate a comprehensive final response to the user's query."
+        
+        # Generar respuesta incremental usando streaming
+        try:
+            # Obtener modelo LLM con capacidad de streaming
+            streaming_model = self.llm_service.chat_model
             
-        # Process how are you
-        if any(phrase in query_lower for phrase in ["how are you", "cómo estás", "qué tal", "como estas", "que tal"]):
-            return "¡Estoy muy bien, gracias por preguntar! ¿En qué proyecto tecnológico puedo ayudarte hoy?"
+            # Crear un mensaje para el chat
+            from langchain_core.messages import HumanMessage
+            message = HumanMessage(content=full_prompt)
             
-        # Process thanks
-        if any(phrase in query_lower for phrase in ["thank", "thanks", "gracias"]):
-            return "¡De nada! Estoy aquí para ayudarte con tus consultas y proyectos tecnológicos. ¿Hay algo más en lo que pueda asistirte?"
+            # Inicializar respuesta vacía
+            full_response = ""
+            partial_responses = []
             
-        # Process goodbye
-        if any(phrase in query_lower for phrase in ["bye", "goodbye", "adiós", "adios", "chao"]):
-            return "¡Hasta luego! No dudes en volver si necesitas más ayuda con tus proyectos tecnológicos."
+            # Procesar el stream de tokens
+            for chunk in streaming_model.stream([message]):
+                if hasattr(chunk, 'content'):
+                    content = chunk.content
+                else:
+                    content = str(chunk)
+                    
+                if content:
+                    # Acumular respuesta completa
+                    full_response += content
+                    
+                    # Crear mensaje parcial
+                    partial_message = create_message(
+                        content=full_response,
+                        message_type=MessageType.STREAM,
+                        sender=str(AgentRole.CLIENT_COMMUNICATION)
+                    )
+                    partial_message.is_partial = True
+                    
+                    # Añadir a la lista de mensajes parciales
+                    partial_responses.append(partial_message)
+                    
+                    # Crear respuesta de agente parcial
+                    partial_agent_response = create_agent_response(
+                        content=full_response,
+                        agent_role=AgentRole.CLIENT_COMMUNICATION,
+                        sources=[doc.id for doc in state.context],
+                    )
+                    partial_agent_response.is_partial = True
+                    
+                    # Actualizar estado con respuesta parcial
+                    state.partial_responses[AgentRole.CLIENT_COMMUNICATION] = partial_agent_response
             
-        # Default response for other short queries
-        return "Estoy aquí para ayudarte con consultas técnicas y proyectos tecnológicos. ¿Tienes alguna pregunta específica o necesitas información sobre algún tema en particular?"
+            # Una vez completado el streaming, actualizar con la respuesta final
+            agent_response = create_agent_response(
+                content=full_response,
+                agent_role=AgentRole.CLIENT_COMMUNICATION,
+                sources=[doc.id for doc in state.context],
+            )
+            
+            # Update state
+            state.agent_responses[AgentRole.CLIENT_COMMUNICATION] = agent_response
+            state.final_response = full_response
+            
+            # Añadir mensajes parciales al historial si se desea
+            state.messages.extend(partial_responses)
+            
+        except Exception as e:
+            # En caso de error, crear una respuesta de error
+            error_message = f"Error al generar respuesta en streaming: {str(e)}"
+            
+            agent_response = create_agent_response(
+                content=error_message,
+                agent_role=AgentRole.CLIENT_COMMUNICATION,
+                sources=[],
+            )
+            
+            # Update state
+            state.agent_responses[AgentRole.CLIENT_COMMUNICATION] = agent_response
+            state.final_response = error_message
+        
+        return state
     
     def should_use_code_review(self, state: GraphState) -> str:
         """Determine if the Code Review agent should be used.
@@ -734,130 +812,74 @@ class AgentNodes:
         else:
             return "skip_data_analysis"
     
-    def process_user_query(self, query: str, conversation_history: Optional[List[Dict]] = None) -> Dict[str, Any]:
+    def process_user_query(self, query: str, conversation_history: Optional[List[Dict]] = None, streaming: bool = False) -> Dict[str, Any]:
         """Process a user query through the agent workflow.
         
         Args:
-            query: User query string
-            conversation_history: Optional list of previous messages
+            query: User query text
+            conversation_history: Optional list of previous conversation messages
+            streaming: Whether to enable streaming responses
             
         Returns:
-            Result dictionary with agent responses and final response
+            Dictionary with the processing results
         """
-        from src.graph.agent_graph import create_agent_graph
-        import logging
-        
-        logger = logging.getLogger(__name__)
-        
-        # Initialize messages from conversation history
-        messages = []
-        if conversation_history:
-            for msg in conversation_history:
-                message_type = MessageType(msg.get("type", "human"))
-                messages.append(create_message(
-                    msg.get("content", ""),
-                    message_type,
-                    msg.get("sender")
-                ))
-        
-        # Fast path for simple conversational queries
-        if self._is_simple_conversational_query(query):
-            logger.info(f"Detected simple conversational query: '{query}'. Using fast path response.")
-            
-            # Generate simple response
-            simple_response = self._generate_conversational_response(query, messages)
-            
-            # Create a simple agent response
-            agent_response = create_agent_response(
-                content=simple_response,
-                agent_role=AgentRole.CLIENT_COMMUNICATION,
-                sources=[],
-            )
-            
-            # Return minimal result dictionary
-            return {
-                "final_response": simple_response,
-                "agent_responses": {
-                    AgentRole.CLIENT_COMMUNICATION: agent_response
-                },
-                "context": []
-            }
-        
-        # Regular processing for non-conversational queries
-        logger.info(f"Processing complex query: '{query}' through full agent workflow")
-        
-        # Create agent graph
-        graph = create_agent_graph(self)
-        
-        # Create initial state
+        # Initialize graph state
         state = GraphState(
-            messages=messages,
-            human_query=query
+            human_query=query,
+            is_streaming=streaming
         )
         
+        # Convert conversation history to Message objects
+        if conversation_history:
+            for message in conversation_history:
+                msg_type = message.get("type", MessageType.HUMAN)
+                msg = create_message(
+                    content=message.get("content", ""),
+                    message_type=msg_type,
+                    sender=message.get("sender", "user" if msg_type == MessageType.HUMAN else "assistant")
+                )
+                state.messages.append(msg)
+        
+        # Add the current query as a message
+        msg = create_message(
+            content=query,
+            message_type=MessageType.HUMAN,
+            sender="user"
+        )
+        state.messages.append(msg)
+        
+        # Get the graph from the create_agent_graph function
+        from src.graph.agent_graph import create_agent_graph
+        graph = create_agent_graph(self)
+        
         # Run the workflow
-        try:
-            result = graph.invoke(state)
-            logger.info("Graph execution completed successfully")
-            
-            # Check if result is an AddableValuesDict
-            if hasattr(result, "get"):
-                logger.info("Result is an AddableValuesDict, extracting values")
-                # Try to extract client_communication agent's response as final response
-                agent_responses = {}
-                final_response = None
-                context = []
-                
-                # Extract agent responses if available
-                if hasattr(result, "agent_responses") or (hasattr(result, "get") and result.get("agent_responses")):
-                    agent_responses = result.agent_responses if hasattr(result, "agent_responses") else result.get("agent_responses", {})
-                    
-                    # Get final response from client communication agent
-                    if AgentRole.CLIENT_COMMUNICATION in agent_responses:
-                        final_response = agent_responses[AgentRole.CLIENT_COMMUNICATION].content
-                
-                # Extract context if available
-                if hasattr(result, "context") or (hasattr(result, "get") and result.get("context")):
-                    context = result.context if hasattr(result, "context") else result.get("context", [])
-                
-                # Extract final_response if not already set
-                if final_response is None and (hasattr(result, "final_response") or (hasattr(result, "get") and result.get("final_response"))):
-                    final_response = result.final_response if hasattr(result, "final_response") else result.get("final_response")
-                
-                # Fallback response if still not set
-                if not final_response:
-                    logger.warning("No final response available, using fallback")
-                    if agent_responses and len(agent_responses) > 0:
-                        # Use the last agent's response as fallback
-                        last_agent = list(agent_responses.values())[-1]
-                        final_response = last_agent.content
-                    else:
-                        final_response = "Lo siento, no pude generar una respuesta específica para tu consulta. Por favor intenta reformular tu pregunta."
-                
-                return {
-                    "final_response": final_response,
-                    "agent_responses": agent_responses,
-                    "context": context
-                }
-            else:
-                # Traditional access pattern if result is as expected
-                final_response = result.final_response if hasattr(result, "final_response") else "¡Hola! Soy el asistente de empresa con Agentes IA. ¿En qué puedo ayudarte hoy?"
-                agent_responses = result.agent_responses if hasattr(result, "agent_responses") else {}
-                context = result.context if hasattr(result, "context") else []
-                
-                return {
-                    "final_response": final_response,
-                    "agent_responses": agent_responses,
-                    "context": context
-                }
-        except Exception as e:
-            logger.error(f"Error processing query: {str(e)}")
-            import traceback
-            logger.error(traceback.format_exc())
-            
-            # Return a friendly default response in case of error
+        final_state = graph.invoke(state)
+        
+        # Manejar correctamente el tipo AddableValuesDict para las versiones nuevas de LangGraph
+        if not isinstance(final_state, dict) and hasattr(final_state, "get"):
+            # Es un AddableValuesDict, acceder usando .get()
             return {
-                "final_response": f"¡Hola! Soy el asistente de empresa con Agentes IA. Hubo un problema procesando tu consulta: {str(e)}. Por favor intenta con otra pregunta.",
-                "agent_responses": {},
-                "context": []
+                "final_response": final_state.get("final_response", ""),
+                "agent_responses": final_state.get("agent_responses", {}),
+                "context": final_state.get("context", []),
+                "is_streaming": final_state.get("is_streaming", False),
+                "partial_responses": final_state.get("partial_responses", {}) if final_state.get("is_streaming", False) else {}
+            }
+        elif isinstance(final_state, dict):
+            # Ya es un diccionario normal
+            return {
+                "final_response": final_state.get("final_response", ""),
+                "agent_responses": final_state.get("agent_responses", {}),
+                "context": final_state.get("context", []),
+                "is_streaming": final_state.get("is_streaming", False),
+                "partial_responses": final_state.get("partial_responses", {}) if final_state.get("is_streaming", False) else {}
+            }
+        else:
+            # Intentar acceder directamente a los atributos de GraphState
+            return {
+                "final_response": getattr(final_state, "final_response", ""),
+                "agent_responses": getattr(final_state, "agent_responses", {}),
+                "context": getattr(final_state, "context", []),
+                "is_streaming": getattr(final_state, "is_streaming", False),
+                "partial_responses": getattr(final_state, "partial_responses", {}) if getattr(final_state, "is_streaming", False) else {}
             } 

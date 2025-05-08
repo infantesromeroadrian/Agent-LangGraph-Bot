@@ -1,6 +1,6 @@
 """Data models for the company agent application."""
 from enum import Enum
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Union, Any
 from pydantic import BaseModel, Field
 
 
@@ -21,6 +21,7 @@ class MessageType(str, Enum):
     AI = "ai"
     SYSTEM = "system"
     TOOL = "tool"
+    STREAM = "stream"  # Nueva categoría para mensajes parciales
 
 
 class ToolResultType(str, Enum):
@@ -37,6 +38,8 @@ class Message(BaseModel):
     sender: Optional[str] = None
     timestamp: Optional[str] = None
     metadata: Optional[Dict] = Field(default_factory=dict)
+    # Campo para indicar si este es un mensaje parcial en streaming
+    is_partial: bool = False
 
 
 class CompanyDocument(BaseModel):
@@ -75,6 +78,9 @@ class AgentResponse(BaseModel):
     sources: List[str] = Field(default_factory=list)
     thought_process: Optional[str] = None
     metadata: Dict = Field(default_factory=dict)
+    is_partial: bool = False
+    # Vector de pensamiento para compartir entre agentes
+    thought_vector: Optional[List[float]] = None
 
 
 class GraphState(BaseModel):
@@ -86,4 +92,13 @@ class GraphState(BaseModel):
     tool_results: List[ToolResult] = Field(default_factory=list)
     agent_responses: Dict[str, AgentResponse] = Field(default_factory=dict)
     final_response: Optional[str] = None
-    metadata: Dict = Field(default_factory=dict) 
+    metadata: Dict = Field(default_factory=dict)
+    # Nuevos campos para memoria compartida avanzada
+    thought_vectors: Dict[str, List[float]] = Field(default_factory=dict)
+    shared_memory: Dict[str, Any] = Field(default_factory=dict)
+    # Configuración dinámica del grafo
+    active_nodes: List[str] = Field(default_factory=list)
+    disabled_nodes: List[str] = Field(default_factory=list)
+    # Control de streaming
+    is_streaming: bool = False
+    partial_responses: Dict[str, AgentResponse] = Field(default_factory=dict) 

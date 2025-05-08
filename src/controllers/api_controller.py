@@ -6,6 +6,8 @@ import io
 import os
 import tempfile
 from fastapi import APIRouter, HTTPException, Depends, Body, UploadFile, File, Form, Request
+from fastapi.responses import StreamingResponse, JSONResponse
+import asyncio
 
 from src.models.class_models import QueryInput, MessageType
 from src.agents.agent_nodes import AgentNodes
@@ -47,11 +49,15 @@ async def process_query(query_input: QueryInput):
                 "sender": msg.sender
             })
         
+        # Check if streaming is requested in metadata
+        enable_streaming = query_input.metadata.get("streaming", False)
+        
         # Process the query through the agent workflow
         logger.info("Processing query through agent workflow")
         result = agent_nodes.process_user_query(
             query=query_input.query,
-            conversation_history=context_dict
+            conversation_history=context_dict,
+            streaming=enable_streaming
         )
         
         logger.info("Query processed, preparing response")
@@ -72,7 +78,8 @@ async def process_query(query_input: QueryInput):
             "query": query_input.query,
             "response": result.get("final_response", "Lo siento, no pude generar una respuesta."),
             "agent_responses": {},
-            "context_documents": []
+            "context_documents": [],
+            "streaming": result.get("is_streaming", False)
         }
         
         # Add agent responses
@@ -108,6 +115,26 @@ async def process_query(query_input: QueryInput):
                 # Already a dict or other structure
                 response["context_documents"].append(doc)
             
+        # Add partial responses if streaming was enabled
+        if result.get("is_streaming", False):
+            partial_responses = result.get("partial_responses", {})
+            response["partial_responses"] = {}
+            
+            for role, partial_response in partial_responses.items():
+                if not isinstance(partial_response, dict) and hasattr(partial_response, '__dict__'):
+                    # Convert object to dict if needed
+                    partial_response_dict = {
+                        "content": getattr(partial_response, "content", ""),
+                        "agent_id": getattr(partial_response, "agent_id", ""),
+                        "agent_role": getattr(partial_response, "agent_role", role),
+                        "sources": getattr(partial_response, "sources", []),
+                        "is_partial": True
+                    }
+                    response["partial_responses"][role] = partial_response_dict
+                else:
+                    # Already a dict or other structure
+                    response["partial_responses"][role] = partial_response
+        
         logger.info("Query processed successfully")
         return response
         
@@ -123,6 +150,96 @@ async def process_query(query_input: QueryInput):
             "context_documents": [],
             "error": str(e)  # Include error for frontend debugging
         }
+
+
+@router.post("/query/stream")
+async def stream_query(query_input: QueryInput):
+    """Process a query and stream the response as it's generated.
+    
+    Args:
+        query_input: User query input
+        
+    Returns:
+        Streaming response with response chunks
+    """
+    async def generate():
+        try:
+            # Add streaming flag to metadata
+            if not query_input.metadata:
+                query_input.metadata = {}
+            query_input.metadata["streaming"] = True
+            
+            # Convert context to expected format
+            context_dict = []
+            for msg in query_input.context:
+                context_dict.append({
+                    "content": msg.content,
+                    "type": msg.type,
+                    "sender": msg.sender
+                })
+            
+            # Start processing in a separate thread to not block
+            loop = asyncio.get_event_loop()
+            result = await loop.run_in_executor(
+                None,
+                lambda: agent_nodes.process_user_query(
+                    query=query_input.query,
+                    conversation_history=context_dict,
+                    streaming=True
+                )
+            )
+            
+            # Initial response
+            yield "data: " + '{"type": "start", "content": ""}\n\n'
+            
+            # Stream partial responses
+            partial_responses = result.get("partial_responses", {})
+            if partial_responses:
+                for role, response in partial_responses.items():
+                    if hasattr(response, "content"):
+                        content = response.content
+                    else:
+                        content = str(response)
+                    
+                    # Send each partial result
+                    yield f"data: {{\n"
+                    yield f'"type": "partial",\n'
+                    yield f'"role": "{role}",\n'
+                    yield f'"content": "{content.replace(chr(34), chr(92)+chr(34)).replace(chr(10), chr(92)+"n")}"\n'
+                    yield f"}}\n\n"
+                    
+                    # Small delay to control rate
+                    await asyncio.sleep(0.01)
+            
+            # Final response
+            final_content = result.get("final_response", "")
+            yield f"data: {{\n"
+            yield f'"type": "final",\n'
+            yield f'"content": "{final_content.replace(chr(34), chr(92)+chr(34)).replace(chr(10), chr(92)+"n")}"\n'
+            yield f"}}\n\n"
+            
+            # End of stream
+            yield "data: " + '{"type": "end"}\n\n'
+            
+        except Exception as e:
+            logger.error(f"Error in stream_query: {str(e)}")
+            logger.error(traceback.format_exc())
+            
+            # Send error in the stream
+            yield f"data: {{\n"
+            yield f'"type": "error",\n'
+            yield f'"content": "Error: {str(e).replace(chr(34), chr(92)+chr(34))}"\n'
+            yield f"}}\n\n"
+    
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+        }
+    )
 
 
 @router.post("/documents/search")
